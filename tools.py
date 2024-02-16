@@ -21,11 +21,11 @@ def wavScaler(x):
 
 def stitch_frames(frames, fade_pow, padding="?"):
 
-    frames = [wavScaler(f) for f in frames]
+    frames = [wavScaler(fade_sound(f)) for f in frames]
     return np.concatenate(frames)
 
 
-def fade_sound(x, pow=0.2):
+def fade_sound(x, pow=1):
     """Fades start and end"""
     w = np.hamming(len(x)) ** pow
     return x * w
