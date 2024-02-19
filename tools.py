@@ -19,13 +19,23 @@ def wavScaler(x):
     """Scales a signal to wavfile integer range"""
     return np.int16(x / np.max(np.abs(x)) * np.iinfo(np.int16).max)
 
-def stitch_frames(frames, fade_pow, padding="?"):
+def stitch_frames(frames, fade_pow = 0, padding=0):
+    """concatenate frames together, with optional fading and padding (silence) between frames.
+    Also scales to wav-integer"""
 
-    frames = [wavScaler(fade_sound(f)) for f in frames]
-    return np.concatenate(frames)
+    if fade_pow>0:
+        frames = [wavScaler(fade_sound(f,fade_pow)) for f in frames]
+    else:
+        frames = [wavScaler(f) for f in frames]
+
+    # add padding zeros after each frame
+    frames = [np.concatenate((f,np.zeros(int(padding)))) for f in frames]
+
+    return np.concatenate(frames).astype(np.int16)
 
 
-def fade_sound(x, pow=1):
-    """Fades start and end"""
+
+def fade_sound(x, pow=0):
+    """Fades start and end of signal"""
     w = np.hamming(len(x)) ** pow
     return x * w
