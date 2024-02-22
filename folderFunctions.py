@@ -36,31 +36,16 @@ def updateFolder(language, file, label, id, fs):
     # id - String containing individual information on format XXX
 
     org_folder = os.getcwd()
-    # Check if folder exists
-    #path = org_folder+'/Languages/'+language+'/Vowels/'+label
-    path = org_folder + '/Languages/'+language+'/Vowels/'+label +'/' + id +'.wav'
-    #if os.path.exists(path):
-        # Change directory
-        #os.chdir(path)
-        # Check if folder for id exists
-        #if id.upper() not in (name.upper() for name in os.listdir()):
-            # If not add folder
-            #os.mkdir(id)
-        # Change folder
-        #os.chdir(path + '/' + id)
-    wavfile.write(path, fs, file)
-        # Move file from original folder to desired folder
-        #source = os.path.join(org_folder, file)
-        #destination = os.path.join(os.getcwd(), file)
-        #try:
-        #    os.replace(source, destination)
-        #except FileNotFoundError:
-        #    print('File does not exist')
-    #else:
-     #   print('Folder does not exist')
-    
-    # Go back to original folder
-    #os.chdir(org_folder)   
+    path = org_folder + '/Languages/'+language+'/Vowels/'+label 
+    if os.path.exists(path):
+        os.chdir(path)
+        matches = [name for name in os.listdir() if id in name]
+        os.chdir(org_folder)
+        path = path + id + label + len(matches)
+        wavfile.write(path, fs, file)
+    else:
+        print('Folder does not exist')
+
 
 def addVowelToLanguage(language, vowel):
     # Adds vowel to language folder
