@@ -36,12 +36,12 @@ def updateFolder(language, file, label, id, fs):
     # id - String containing individual information on format XXX
 
     org_folder = os.getcwd()
-    path = org_folder + '/Languages/'+language+'/Vowels/'+label 
+    path = org_folder + '/Languages/'+language+'/Vowels/'+label + '/'
     if os.path.exists(path):
         os.chdir(path)
         matches = [name for name in os.listdir() if id in name]
         os.chdir(org_folder)
-        path = path + id + label + len(matches)
+        path = path + id + '-' + label + str(len(matches)) + '.wav'
         wavfile.write(path, fs, file)
     else:
         print('Folder does not exist')

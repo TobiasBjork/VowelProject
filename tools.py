@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 def split_frames(x, fl, Fs, overlap=0):
@@ -120,3 +121,25 @@ def binary_start_stop(sequence):
             stops.append(i)
 
     return starts, stops
+
+
+def plotPeaks(audio, frame_center, frames_start, hnr_frames, peaks_prop, peaks, tt):
+    plt.figure(figsize=(15, 5))
+    plt.plot(tt, audio, linewidth=1, label="signal")
+    plt.xlabel("Time (s)")
+    plt.plot(frame_center, hnr_frames, "*", label="HNR")
+    ymin, ymax = plt.ylim()
+    plt.vlines(tt[frames_start], ymin, ymax, linestyles="dashed")
+    # plt.xlim(0,1.5)
+    plt.legend()
+    plt.show()
+
+    #print(peaks_prop.keys())
+    plt.figure()
+    plt.plot(frame_center, hnr_frames)
+
+    # mark peaks
+    plt.plot(frame_center[peaks], peaks_prop["peak_heights"], "*")
+    plt.xlabel("Time(s)")
+    plt.ylabel("HNR")
+    plt.show()

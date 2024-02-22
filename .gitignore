@@ -7,6 +7,9 @@ example_speech_mp3/
 #languages lots of files
 Languages/
 
+#chunks
+example_speech_Andreas/chunks
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
