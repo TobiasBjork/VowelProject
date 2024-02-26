@@ -97,7 +97,7 @@ def movmean_peak(sequence, lag=5, thr=1, peak_infl=0.1, duration=1):
     # length of current peak
     in_len = 0
     for i, x in enumerate(is_peak):
-        if x == True:
+        if x is True:
             in_len += 1
         else:
             if in_len < duration:
@@ -182,7 +182,7 @@ def preprocess(path_input: str, path_output="audio_preproc", bpfilt=None):
         # bandpass filter
         fmin, fmax = bpfilt[0], bpfilt[1]
         sos = signal.iirfilter(
-            17, #Filter order
+            17,  # Filter order
             [2 * fmin / Fs, 2 * fmax / Fs],
             rs=60,
             btype="band",
@@ -256,3 +256,27 @@ def print_w(w):
             w["conf"] * 100,
         )
     )
+
+
+def checkVowels(word, vowels):
+    """Returns list of found vowels in a word"""
+    foundVowels = [letter for letter in word if letter in vowels]
+    return foundVowels
+
+
+def segment_by_words(list_of_words, audio, Fs, vowel_set, min_conf=1):
+    """splits an audio into segments, by vosk words.
+    Returns segments, and lists of vowels per segment"""
+    if not type(list_of_words[0] == dict):
+        raise Exception("dict?")
+    segments = []
+    vowels_per_segment = []
+
+    for word in list_of_words:
+        if word["conf"] >= min_conf:
+            vowels_per_segment.append(checkVowels(word["word"].lower(), vowel_set))
+            start = round(word["start"] * Fs)  # start of word
+            end = round(word["end"] * Fs)  # end of word.
+            segments.append(audio[start:end])  # adding word to the list
+
+    return segments, vowels_per_segment
