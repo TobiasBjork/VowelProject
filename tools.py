@@ -7,10 +7,10 @@ from scipy import signal
 import wave
 from vosk import Model, KaldiRecognizer, SetLogLevel
 from Signal_Analysis.features.signal import get_F_0, get_HNR
-from folderFunctions import*
+from folderFunctions import *
 
 
-def split_frames(x, fl, Fs, overlap=0):
+def split_frames(x, fl, Fs, overlap=0, print_info=False):
     """Splits the signal ``x`` into frames of length ``fl``."""
 
     # frame start indices, discard short last frame
@@ -18,11 +18,12 @@ def split_frames(x, fl, Fs, overlap=0):
     # list of frames
     frames = [x[s : s + fl] for s in f_start]
 
-    print(f"frame length    : {fl} samples")
-    print(f"frame length    : {np.round(fl/Fs,3)} seconds")
-    print(f"between frames  : {np.round((fl-overlap)/Fs,3)} seconds")
+    if print_info:
+        print(f"frame length    : {fl} samples")
+        print(f"frame length    : {np.round(fl/Fs,3)} seconds")
+        print(f"between frames  : {np.round((fl-overlap)/Fs,3)} seconds")
 
-    print(f"number of frames: {len(f_start)}")
+        print(f"number of frames: {len(f_start)}")
 
     return frames, f_start
 
@@ -283,39 +284,44 @@ def segment_by_words(list_of_words, audio, Fs, vowel_set, min_conf=1):
 
     return segments, vowels_per_segment
 
-def HNR_peaks(audio, Fs):
+
+def HNR_peaks(audio, Fs, plotit=False):
     tt = np.linspace(0, len(audio) / Fs, len(audio))
-    fl = int(0.05 * Fs)
+    fl = int(0.02 * Fs)
     frames, frames_start = split_frames(audio, fl, Fs, overlap=int(1 * fl / 8))
-    tt_frames_center = tt[frames_start] + int(fl/2)/Fs
+    tt_frames_center = tt[frames_start] + int(fl / 2) / Fs
     hnr_frames = []
     for f in frames:
         hnr_frames.append(get_HNR(f, Fs, silence_threshold=0.5))
-    min_h = max(hnr_frames)/4 #osäker grej
+    min_h = max(hnr_frames) / 4  # osäker grej
     peaks, peaks_prop = signal.find_peaks(
         hnr_frames,
         height=min_h,
+    )
+    if plotit:
+        plotPeaks(
+            audio, tt_frames_center, frames_start, hnr_frames, peaks_prop, peaks, tt
         )
-    plotPeaks(audio, tt_frames_center, frames_start, hnr_frames, peaks_prop, peaks, tt)
     width = signal.peak_widths(hnr_frames, peaks, rel_height=0.5)[0]
     peak_sounds = []
     for i in range(len(width)):
         center_frame = frames[peaks[i]]
-        if width[i] >1:
-            samples = int((width[i]-1)/2 * fl)
+        if width[i] > 1:
+            samples = int((width[i] - 1) / 2 * fl)
             if peaks[i] == 0:
                 left_frame = np.empty()
-                right_frame = frames[peaks[i]+1][:samples]
-            elif peaks[i] == len(frames)-1:
-                left_frame = frames[peaks[i]-1][samples:]
+                right_frame = frames[peaks[i] + 1][:samples]
+            elif peaks[i] == len(frames) - 1:
+                left_frame = frames[peaks[i] - 1][samples:]
                 right_frame = np.empty()
             else:
-                left_frame = frames[peaks[i]-1][samples:]
-                right_frame = frames[peaks[i]+1][:samples]
-            
-            center_frame = np.hstack((left_frame,center_frame,right_frame))
+                left_frame = frames[peaks[i] - 1][samples:]
+                right_frame = frames[peaks[i] + 1][:samples]
+
+            center_frame = np.hstack((left_frame, center_frame, right_frame))
         peak_sounds.append(center_frame)
     return frames, peaks_prop, peaks, peak_sounds
+
 
 def extractVowels(segments, vowels_segments, Fs, language, id):
     for i in range(len(segments)):
