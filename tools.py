@@ -34,7 +34,7 @@ def wavScaler(x):
 
 
 def stitch_frames(frames, fade_pow=0, padding=0):
-    """concatenate frames together, with optional fading and padding (silence) between frames.
+    """concatenate frames together, with optional fading and padding (samples silence) between frames.
     Also scales to wav-integer"""
 
     if fade_pow > 0:
@@ -134,7 +134,8 @@ def binary_start_stop(sequence):
 
 
 def plotPeaks(audio, frame_center, frames_start, hnr_frames, peaks_prop, peaks, tt):
-    plt.figure(figsize=(15, 5))
+    plt.figure(figsize=(15, 10))
+    plt.subplot(211)
     plt.plot(tt, audio, linewidth=1, label="signal")
     plt.xlabel("Time (s)")
     plt.plot(frame_center, hnr_frames, "*", label="HNR")
@@ -142,16 +143,16 @@ def plotPeaks(audio, frame_center, frames_start, hnr_frames, peaks_prop, peaks, 
     plt.vlines(tt[frames_start], ymin, ymax, linestyles="dashed")
     # plt.xlim(0,1.5)
     plt.legend()
-    plt.show()
 
     # print(peaks_prop.keys())
-    plt.figure()
+    plt.subplot(212)
     plt.plot(frame_center, hnr_frames)
 
     # mark peaks
     plt.plot(frame_center[peaks], peaks_prop["peak_heights"], "*")
     plt.xlabel("Time(s)")
     plt.ylabel("HNR")
+    plt.tight_layout()
     plt.show()
 
 
@@ -243,21 +244,22 @@ def rec_vosk(audio_path: str, model, print_summary=True) -> list[dict]:
             words.append(w)  # and add it to list
 
     if print_summary:
-        for w in words:
-            print_w(w)
+        for i, w in enumerate(words):
+            print_w(i, w)
 
     return words
 
 
-def print_w(w):
+def print_w(i, w):
     """prints the word, and its information, from a word dictionary"""
     print(
+        i,
         "{:20} from {:.2f} to {:.2f} sec, confidence: {:.2f}%".format(
             w["word"] + " " + ("-" * (20 - len(w["word"]))),
             w["start"],
             w["end"],
             w["conf"] * 100,
-        )
+        ),
     )
 
 
@@ -285,41 +287,42 @@ def segment_by_words(list_of_words, audio, Fs, vowel_set, min_conf=1):
     return segments, vowels_per_segment
 
 
-def HNR_peaks(audio, Fs, plotit=False):
+def HNR_peaks(audio, Fs, n_peaks=-1, plotit=False):
     tt = np.linspace(0, len(audio) / Fs, len(audio))
-    fl = int(0.02 * Fs)
-    frames, frames_start = split_frames(audio, fl, Fs, overlap=int(1 * fl / 8))
+    fl = int(0.08 * Fs)
+    frames, frames_start = split_frames(audio, fl, Fs, overlap=int(6 * fl / 8))
     tt_frames_center = tt[frames_start] + int(fl / 2) / Fs
     hnr_frames = []
     for f in frames:
-        hnr_frames.append(get_HNR(f, Fs, silence_threshold=0.5))
-    min_h = max(hnr_frames) / 4  # osäker grej
-    peaks, peaks_prop = signal.find_peaks(
-        hnr_frames,
-        height=min_h,
-    )
+        hnr_frames.append(get_HNR(f, Fs))
+    min_h = max(hnr_frames) / 10  # osäker grej
+    peaks, peaks_prop = signal.find_peaks(hnr_frames, height=min_h)
+    order = np.argsort(-peaks_prop["peak_heights"])
+    peaks = [peaks[i] for i in order][:n_peaks]
+
+    for k in peaks_prop.keys():
+        peaks_prop[k] = [peaks_prop[k][i] for i in order][:n_peaks]
+
+    # width of peak at half max
+    width = signal.peak_widths(hnr_frames, peaks, rel_height=0.5)[0]
+    #width = 1 * np.ones(len(peaks))
+    peak_sounds = []
+    for i in range(len(width)):
+        print(width[i])
+        start = int((Fs * tt_frames_center[peaks[i]] - width[i] / 2 * fl))
+        end = int((Fs * tt_frames_center[peaks[i]] + width[i] / 2 * fl))
+
+        peak_sounds.append(audio[max(0, start) : min(end, len(audio))])
+
     if plotit:
+        plt.figure(figsize=(15, 5))
+        plt.plot(tt, audio)
+        plt.vlines(tt[start], *plt.ylim(), colors="r")
+        plt.vlines(tt[end], *plt.ylim(), colors="r")
         plotPeaks(
             audio, tt_frames_center, frames_start, hnr_frames, peaks_prop, peaks, tt
         )
-    width = signal.peak_widths(hnr_frames, peaks, rel_height=0.5)[0]
-    peak_sounds = []
-    for i in range(len(width)):
-        center_frame = frames[peaks[i]]
-        if width[i] > 1:
-            samples = int((width[i] - 1) / 2 * fl)
-            if peaks[i] == 0:
-                left_frame = np.empty()
-                right_frame = frames[peaks[i] + 1][:samples]
-            elif peaks[i] == len(frames) - 1:
-                left_frame = frames[peaks[i] - 1][samples:]
-                right_frame = np.empty()
-            else:
-                left_frame = frames[peaks[i] - 1][samples:]
-                right_frame = frames[peaks[i] + 1][:samples]
 
-            center_frame = np.hstack((left_frame, center_frame, right_frame))
-        peak_sounds.append(center_frame)
     return frames, peaks_prop, peaks, peak_sounds
 
 
