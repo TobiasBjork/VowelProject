@@ -173,7 +173,7 @@ def preprocess(path_input: str, path_output="audio_preproc", bpfilt=None):
     ----------
     path_input: path to file
     path_output: path to folder for output
-    bpfilt: low and high cutoff for filter
+    bpfilt: low and high cutoff for filter. Default none
     """
 
     name = path.split(path_input[:-4])[-1]
@@ -308,7 +308,7 @@ def HNR_peaks(audio, Fs, n_peaks=-1, plotit=False):
     order = np.argsort(-peaks_prop["peak_heights"])
     peaks = [peaks[i] for i in order][:n_peaks]
 
-    peaks = peaks[peaks > np.sorted(peaks, reverse=True)[n_peaks]]
+    #peaks = peaks[peaks > np.sorted(peaks, reverse=True)[n_peaks]]
 
     for k in peaks_prop.keys():
         peaks_prop[k] = [peaks_prop[k][i] for i in order][:n_peaks]
