@@ -19,8 +19,8 @@ def split_frames(x, fl, Fs, overlap=0, print_info=False):
     frames: list[ndarray]
     f_start: ndarray"""
 
-    # frame start indices, discard short last frame
-    f_start = np.arange(0, len(x), fl - overlap)[:-1]
+    # frame start indices
+    f_start = np.arange(0, len(x), fl - overlap)
     # list of frames
     frames = [x[s : s + fl] for s in f_start]
 
@@ -39,7 +39,7 @@ def wavScaler(x):
     return np.int16(x / np.max(np.abs(x)) * np.iinfo(np.int16).max)
 
 
-def stitch_frames(frames, fade_pow=0, padding=0):
+def stitch_frames(frames, fade_pow=0.0, padding=0):
     """concatenate frames together, with optional fading and padding (samples silence) between frames.
     Also scales to wav-integer"""
 
@@ -54,7 +54,7 @@ def stitch_frames(frames, fade_pow=0, padding=0):
     return np.concatenate(frames).astype(np.int16)
 
 
-def fade_sound(x, pow=0):
+def fade_sound(x, pow=0.0):
     """Fades start and end of signal"""
     w = np.hamming(len(x)) ** pow
     return x * w
@@ -308,7 +308,7 @@ def HNR_peaks(audio, Fs, n_peaks=-1, plotit=False):
     order = np.argsort(-peaks_prop["peak_heights"])
     peaks = [peaks[i] for i in order][:n_peaks]
 
-    #peaks = peaks[peaks > np.sorted(peaks, reverse=True)[n_peaks]]
+    # peaks = peaks[peaks > np.sorted(peaks, reverse=True)[n_peaks]]
 
     for k in peaks_prop.keys():
         peaks_prop[k] = [peaks_prop[k][i] for i in order][:n_peaks]
