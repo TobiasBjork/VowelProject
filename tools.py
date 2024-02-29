@@ -9,9 +9,15 @@ from vosk import Model, KaldiRecognizer, SetLogLevel
 from Signal_Analysis.features.signal import get_F_0, get_HNR
 from folderFunctions import *
 
+# constants
+VOWELS_SV = {"e", "y", "u", "i", "o", "å", "a", "ö", "ä"}
+
 
 def split_frames(x, fl, Fs, overlap=0, print_info=False):
-    """Splits the signal ``x`` into frames of length ``fl``."""
+    """Splits the signal ``x`` into frames of length ``fl``.
+    ## Returns
+    frames: list[ndarray]
+    f_start: ndarray"""
 
     # frame start indices, discard short last frame
     f_start = np.arange(0, len(x), fl - overlap)[:-1]
@@ -182,7 +188,7 @@ def preprocess(path_input: str, path_output="audio_preproc", bpfilt=None):
     if len(x.shape) == 2:
         x = x[:, 0]
 
-    if not bpfilt == None:
+    if bpfilt is not None:
         # bandpass filter
         fmin, fmax = bpfilt[0], bpfilt[1]
         sos = signal.iirfilter(
@@ -271,9 +277,11 @@ def checkVowels(word, vowels):
 
 def segment_by_words(list_of_words, audio, Fs, vowel_set, min_conf=1):
     """splits an audio into segments, by vosk words.
-    Returns segments, and lists of vowels per segment"""
+    ## Returns
+    segments: ndarray
+    vowels_per_segment: list"""
     if not type(list_of_words[0] == dict):
-        raise Exception("dict?")
+        raise Exception("expects a dict for each word")
     segments = []
     vowels_per_segment = []
 
@@ -300,12 +308,14 @@ def HNR_peaks(audio, Fs, n_peaks=-1, plotit=False):
     order = np.argsort(-peaks_prop["peak_heights"])
     peaks = [peaks[i] for i in order][:n_peaks]
 
+    peaks = peaks[peaks > np.sorted(peaks, reverse=True)[n_peaks]]
+
     for k in peaks_prop.keys():
         peaks_prop[k] = [peaks_prop[k][i] for i in order][:n_peaks]
 
     # width of peak at half max
     width = signal.peak_widths(hnr_frames, peaks, rel_height=0.5)[0]
-    #width = 1 * np.ones(len(peaks))
+    # width = 1 * np.ones(len(peaks))
     peak_sounds = []
     for i in range(len(width)):
         print(width[i])
