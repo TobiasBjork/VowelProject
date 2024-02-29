@@ -1,0 +1,17 @@
+konservativ
+alla ska vara lika korta in i nätverk. säg 30/20 ms
+    kan ta flera på samma vokal om lång.
+    varje block kodas separat till nätverket. 
+
+intressant feature: tonat till otona (vice versa)
+
+volym, stämbanden används mer i högre volym
+
+output
+subfolder per användare
+
+en json per wav
+    metadata
+        tidsstämplen
+        ursprungsfil
+        hellre lite extra
