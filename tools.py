@@ -8,6 +8,8 @@ import wave
 from vosk import Model, KaldiRecognizer, SetLogLevel
 from Signal_Analysis.features.signal import get_F_0, get_HNR
 from folderFunctions import *
+from scipy import signal, interpolate, ndimage
+
 
 # constants
 VOWELS_SV = {"e", "y", "u", "i", "o", "å", "a", "ö", "ä"}
@@ -16,7 +18,7 @@ VOWELS_SV = {"e", "y", "u", "i", "o", "å", "a", "ö", "ä"}
 def vol(x):
     return np.mean(np.abs(x))
 
-def envelope(s, dmax=1):
+def envelope(s, dmax=1,smoothing = 10):
     # locals max
     lmax = (np.diff(np.sign(np.diff(s))) < 0).nonzero()[0] + 1
 
@@ -24,8 +26,12 @@ def envelope(s, dmax=1):
     lmax = lmax[
         [i + np.argmax(s[lmax[i : i + dmax]]) for i in range(0, len(lmax), dmax)]
     ]
+    tt = np.arange(len(s))
+    interp = interpolate.CubicSpline(tt[lmax], s[lmax])
+    env = interp(tt)
+    env = ndimage.gaussian_filter1d(env, smoothing)
 
-    return lmax
+    return env
 
 def split_frames(x, fl, Fs, overlap=0, vol_thr=0, print_info=False):
     """Splits the signal ``x`` into frames of length ``fl``.
@@ -359,6 +365,22 @@ def HNR_peaks(audio, Fs, n_peaks=-1, plotit=False):
         )
 
     return frames, peaks_prop, peaks, peak_sounds
+
+
+def HNR_short(frames, Fs, n_peaks=-1):
+    """get frame index for peaks and hnr per frame"""
+    hnr_frames = np.array([get_HNR(f, Fs) for f in frames])
+
+    min_distance = max(len(frames) / (n_peaks + 2), 1)  # frames
+    peaks, peaks_prop = signal.find_peaks(
+        hnr_frames,
+        height=0.1 * max(hnr_frames),
+        distance=min_distance,
+    )
+    order = (-peaks_prop["peak_heights"]).argsort()  # order
+    peaks = peaks[order[:n_peaks]]  # sort and truncate
+    peaks = np.sort(peaks)  # restore order
+    return peaks, hnr_frames
 
 
 def extractVowels(segments, vowels_segments, Fs, language, id):
