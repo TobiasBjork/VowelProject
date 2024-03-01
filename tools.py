@@ -13,7 +13,21 @@ from folderFunctions import *
 VOWELS_SV = {"e", "y", "u", "i", "o", "å", "a", "ö", "ä"}
 
 
-def split_frames(x, fl, Fs, overlap=0, print_info=False):
+def vol(x):
+    return np.mean(np.abs(x))
+
+def envelope(s, dmax=1):
+    # locals max
+    lmax = (np.diff(np.sign(np.diff(s))) < 0).nonzero()[0] + 1
+
+    # global max of dmax-chunks of locals max
+    lmax = lmax[
+        [i + np.argmax(s[lmax[i : i + dmax]]) for i in range(0, len(lmax), dmax)]
+    ]
+
+    return lmax
+
+def split_frames(x, fl, Fs, overlap=0, vol_thr=0, print_info=False):
     """Splits the signal ``x`` into frames of length ``fl``.
     ## Returns
     frames: list[ndarray]
@@ -23,6 +37,7 @@ def split_frames(x, fl, Fs, overlap=0, print_info=False):
     f_start = np.arange(0, len(x), fl - overlap)
     # list of frames
     frames = [x[s : s + fl] for s in f_start]
+    frames = [f * (vol(f) > vol_thr) for f in frames]
 
     if print_info:
         print(f"frame length    : {fl} samples")
@@ -286,13 +301,23 @@ def segment_by_words(list_of_words, audio, Fs, vowel_set, min_conf=1):
     vowels_per_segment = []
 
     for word in list_of_words:
-        if word["conf"] >= min_conf:
-            vowels_per_segment.append(checkVowels(word["word"].lower(), vowel_set))
-            start = round(word["start"] * Fs)  # start of word
-            end = round(word["end"] * Fs)  # end of word.
-            segments.append(audio[start:end])  # adding word to the list
+        vowels_per_segment.append(checkVowels(word["word"].lower(), vowel_set))
+        start = round(word["start"] * Fs)  # start of word
+        end = round(word["end"] * Fs)  # end of word.
+        segments.append(audio[start:end])  # adding word to the list
 
     return segments, vowels_per_segment
+
+
+def checkIfWhite(signal, wNoiseRatio=0.8):
+    """Checks if input signal noisy
+    ## returns
+    white: bool"""
+    sum0, sum1 = 0, 0
+    for i in range(1, len(signal)):
+        sum0 += abs(signal[i])
+        sum1 += abs(signal[i] - signal[i - 1])
+    return sum1 / sum0 > wNoiseRatio
 
 
 def HNR_peaks(audio, Fs, n_peaks=-1, plotit=False):
