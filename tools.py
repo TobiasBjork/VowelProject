@@ -18,7 +18,8 @@ VOWELS_SV = {"e", "y", "u", "i", "o", "å", "a", "ö", "ä"}
 def vol(x):
     return np.mean(np.abs(x))
 
-def envelope(s, dmax=1,smoothing = 10):
+
+def envelope(s, dmax=1, smoothing=10):
     # locals max
     lmax = (np.diff(np.sign(np.diff(s))) < 0).nonzero()[0] + 1
 
@@ -32,6 +33,7 @@ def envelope(s, dmax=1,smoothing = 10):
     env = ndimage.gaussian_filter1d(env, smoothing)
 
     return env
+
 
 def split_frames(x, fl, Fs, overlap=0, vol_thr=0, print_info=False):
     """Splits the signal ``x`` into frames of length ``fl``.
@@ -296,8 +298,18 @@ def checkVowels(word, vowels):
     return foundVowels
 
 
-def segment_by_words(list_of_words, audio, Fs, vowel_set, min_conf=1):
+def segment_by_words(
+    list_of_words, audio, Fs, vowel_set, min_conf=1, signal_pad=0
+):
     """splits an audio into segments, by vosk words.
+    ## Parameters:
+
+    zero_padd: boolean
+        Add one zero on each side of segment
+
+    signal_pad: int
+        add extra seconds from signal on each side of segment
+
     ## Returns
     segments: ndarray
     vowels_per_segment: list"""
@@ -308,9 +320,13 @@ def segment_by_words(list_of_words, audio, Fs, vowel_set, min_conf=1):
 
     for word in list_of_words:
         vowels_per_segment.append(checkVowels(word["word"].lower(), vowel_set))
-        start = round(word["start"] * Fs)  # start of word
-        end = round(word["end"] * Fs)  # end of word.
-        segments.append(audio[start:end])  # adding word to the list
+        start = round(max(word["start"] * Fs - signal_pad * Fs, 0))  # start of word
+        end = round(min(word["end"] * Fs + signal_pad * Fs, len(audio)))  # end of word.
+        a = audio[start:end]
+
+        segments.append(a)
+
+        # adding word to the list
 
     return segments, vowels_per_segment
 
