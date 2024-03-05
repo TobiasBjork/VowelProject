@@ -1,15 +1,17 @@
-import numpy as np
-import matplotlib.pyplot as plt
-from scipy.io.wavfile import read as readwav, write as writewav
+import wave
 from json import loads
 from os import path
-from scipy import signal
-import wave
-from vosk import Model, KaldiRecognizer, SetLogLevel
-from Signal_Analysis.features.signal import get_F_0, get_HNR
-from folderFunctions import *
-from scipy import signal, interpolate, ndimage
 
+import librosa as lib
+import matplotlib.pyplot as plt
+import numpy as np
+from scipy import interpolate, ndimage, signal
+from scipy.io.wavfile import read as readwav
+from scipy.io.wavfile import write as writewav
+from Signal_Analysis.features.signal import get_F_0, get_HNR
+from vosk import KaldiRecognizer, Model, SetLogLevel
+
+from folderFunctions import *
 
 # constants
 VOWELS_SV = {"e", "y", "u", "i", "o", "å", "a", "ö", "ä"}
@@ -298,9 +300,7 @@ def checkVowels(word, vowels):
     return foundVowels
 
 
-def segment_by_words(
-    list_of_words, audio, Fs, vowel_set, min_conf=1, signal_pad=0
-):
+def segment_by_words(list_of_words, audio, Fs, vowel_set, min_conf=1, signal_pad=0):
     """splits an audio into segments, by vosk words.
     ## Parameters:
 
@@ -405,3 +405,14 @@ def extractVowels(segments, vowels_segments, Fs, language, id):
         if len(peaks) == len(vowels_segments[i]):
             for j in range(len(peaks)):
                 updateFolder(language, peaks_sounds[j], vowels_segments[i][j], id, Fs)
+
+
+def get_mfcc(x, Fs, n=50):
+    """Compute n first MFCCoefficients"""
+    if isinstance(x, list):
+        return [
+            np.mean(lib.feature.mfcc(y=xi, sr=Fs, n_mfcc=n, n_fft=512).T, axis=0)
+            for xi in x
+        ]
+    else:
+        return np.mean(lib.feature.mfcc(y=x, sr=Fs, n_mfcc=n, n_fft=512).T, axis=0)
