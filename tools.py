@@ -21,6 +21,10 @@ def vol(x):
     return np.mean(np.abs(x))
 
 
+def vol_db(x, ref=1):
+    return 10 * np.log10(np.mean(x**2) / ref)
+
+
 def envelope(s, dmax=1, smoothing=10):
     # locals max
     lmax = (np.diff(np.sign(np.diff(s))) < 0).nonzero()[0] + 1
@@ -407,7 +411,7 @@ def extractVowels(segments, vowels_segments, Fs, language, id):
                 updateFolder(language, peaks_sounds[j], vowels_segments[i][j], id, Fs)
 
 
-def get_mfcc(x, Fs, n=50, normalize = True):
+def get_mfcc(x, Fs, n=50, normalize=True):
     """Compute n first MFCCoefficients,
     for a list of segments it returns coefficient for every (normalized) segment"""
     if isinstance(x, list):
@@ -420,9 +424,13 @@ def get_mfcc(x, Fs, n=50, normalize = True):
         ]
     else:
         if normalize:
-            return np.mean(lib.feature.mfcc(y=normalize_std(x), sr=Fs, n_mfcc=n, n_fft=512).T, axis=0)
-        else: 
+            return np.mean(
+                lib.feature.mfcc(y=normalize_std(x), sr=Fs, n_mfcc=n, n_fft=512).T,
+                axis=0,
+            )
+        else:
             return np.mean(lib.feature.mfcc(y=x, sr=Fs, n_mfcc=n, n_fft=512).T, axis=0)
+
 
 def normalize_std(x):
     """Normalize a signal, returns zero for zero signal"""
