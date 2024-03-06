@@ -407,12 +407,26 @@ def extractVowels(segments, vowels_segments, Fs, language, id):
                 updateFolder(language, peaks_sounds[j], vowels_segments[i][j], id, Fs)
 
 
-def get_mfcc(x, Fs, n=50):
-    """Compute n first MFCCoefficients"""
+def get_mfcc(x, Fs, n=50, normalize = True):
+    """Compute n first MFCCoefficients,
+    for a list of segments it returns coefficient for every (normalized) segment"""
     if isinstance(x, list):
         return [
-            np.mean(lib.feature.mfcc(y=xi, sr=Fs, n_mfcc=n, n_fft=512).T, axis=0)
+            np.mean(
+                lib.feature.mfcc(y=normalize_std(xi), sr=Fs, n_mfcc=n, n_fft=512).T,
+                axis=0,
+            )
             for xi in x
         ]
     else:
-        return np.mean(lib.feature.mfcc(y=x, sr=Fs, n_mfcc=n, n_fft=512).T, axis=0)
+        if normalize:
+            return np.mean(lib.feature.mfcc(y=normalize_std(x), sr=Fs, n_mfcc=n, n_fft=512).T, axis=0)
+        else: 
+            return np.mean(lib.feature.mfcc(y=x, sr=Fs, n_mfcc=n, n_fft=512).T, axis=0)
+
+def normalize_std(x):
+    """Normalize a signal, returns zero for zero signal"""
+    if np.ptp(x) == 0:
+        return x
+    else:
+        return x / np.std(x)
