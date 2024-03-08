@@ -10,6 +10,9 @@ Languages/
 #chunks
 example_speech_Andreas/chunks
 
+#praat
+praat/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
