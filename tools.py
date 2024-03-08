@@ -438,3 +438,35 @@ def normalize_std(x):
         return x
     else:
         return x / np.std(x)
+
+
+def julgran(words, audio, Fs, fl, add_context=False):
+    grouped_frames = {v: [] for v in VOWELS_SV}
+    segments, vowels_per_segment = segment_by_words(
+        words, audio, Fs, VOWELS_SV, signal_pad=0.02
+    )
+    for w, segment, vowels in zip(words, segments, vowels_per_segment):
+        if w["conf"] >= 1:
+            # print(w["word"], w["conf"])
+            segment = np.concatenate((np.zeros(fl), segment, np.zeros(fl)))
+            frames, f_start = split_frames(segment, fl, Fs, vol_thr=0, overlap=0)
+            peak_frames, hnr_frames = HNR_short(frames, Fs, len(vowels))
+            if len(peak_frames) == len(vowels):
+                for i, v in enumerate(vowels):
+                    frame = frames[peak_frames[i]]
+                    if not checkIfWhite(frame, wNoiseRatio=0.5):
+                        if vol_db(frame) > 30:
+                            if np.sum(abs(frame) < 0.1 * max(frame)) / len(frame) < 0.5:
+                                if add_context:
+                                    grouped_frames[v].append(
+                                        stitch_frames(
+                                            frames[
+                                                max(peak_frames[i] - 2, 0) : min(
+                                                    peak_frames[i] + 2, len(frames)
+                                                )
+                                            ]
+                                        )
+                                    )
+                                else:
+                                    grouped_frames[v].append(frames[peak_frames[i]])
+    return grouped_frames
