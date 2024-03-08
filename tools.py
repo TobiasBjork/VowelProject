@@ -289,7 +289,7 @@ def print_w(i, w):
     """prints the word, and its information, from a word dictionary"""
     print(
         i,
-        "{:20} from {:.2f} to {:.2f} sec, confidence: {:.2f}%".format(
+        "{:20} from {:.4f} to {:.4f} sec, confidence: {:.2f}%".format(
             w["word"] + " " + ("-" * (20 - len(w["word"]))),
             w["start"],
             w["end"],
@@ -321,18 +321,20 @@ def segment_by_words(list_of_words, audio, Fs, vowel_set, min_conf=1, signal_pad
         raise Exception("expects a dict for each word")
     segments = []
     vowels_per_segment = []
-
+    s_start = []
     for word in list_of_words:
         vowels_per_segment.append(checkVowels(word["word"].lower(), vowel_set))
-        start = round(max(word["start"] * Fs - signal_pad * Fs, 0))  # start of word
+        start = round(
+            max(word["start"] * Fs - signal_pad * Fs, 0)
+        )  # start of word (sample)
         end = round(min(word["end"] * Fs + signal_pad * Fs, len(audio)))  # end of word.
         a = audio[start:end]
 
         segments.append(a)
+        s_start.append(start)
 
         # adding word to the list
-
-    return segments, vowels_per_segment
+    return segments, vowels_per_segment, s_start
 
 
 def checkIfWhite(signal, wNoiseRatio=0.8):
@@ -441,13 +443,22 @@ def normalize_std(x):
 
 
 def julgran(words, audio, Fs, fl, add_context=False):
-    grouped_frames = {v: [] for v in VOWELS_SV}
-    segments, vowels_per_segment = segment_by_words(
-        words, audio, Fs, VOWELS_SV, signal_pad=0.02
+    grouped_frames = {v: {} for v in VOWELS_SV}
+
+    # initialize lists
+    for v in grouped_frames.keys():
+        grouped_frames[v]["frame"] = []
+        grouped_frames[v]["start"] = []
+        grouped_frames[v]["stop"] = []
+
+    segments, vowels_per_segment, s_starts = segment_by_words(
+        words, audio, Fs, VOWELS_SV, signal_pad=0
     )
-    for w, segment, vowels in zip(words, segments, vowels_per_segment):
+    for w, segment, vowels, start_segment in zip(
+        words, segments, vowels_per_segment, s_starts
+    ):
         if w["conf"] >= 1:
-            # print(w["word"], w["conf"])
+            # zero padding
             segment = np.concatenate((np.zeros(fl), segment, np.zeros(fl)))
             frames, f_start = split_frames(segment, fl, Fs, vol_thr=0, overlap=0)
             peak_frames, hnr_frames = HNR_short(frames, Fs, len(vowels))
@@ -458,7 +469,7 @@ def julgran(words, audio, Fs, fl, add_context=False):
                         if vol_db(frame) > 30:
                             if np.sum(abs(frame) < 0.1 * max(frame)) / len(frame) < 0.5:
                                 if add_context:
-                                    grouped_frames[v].append(
+                                    grouped_frames[v]["frame"].append(
                                         stitch_frames(
                                             frames[
                                                 max(peak_frames[i] - 2, 0) : min(
@@ -468,5 +479,14 @@ def julgran(words, audio, Fs, fl, add_context=False):
                                         )
                                     )
                                 else:
-                                    grouped_frames[v].append(frames[peak_frames[i]])
+                                    grouped_frames[v]["frame"].append(
+                                        frames[peak_frames[i]]
+                                    )
+                                # start and stop (of real frame) (-fl compensates zeropadding)
+                                start_vowel = (
+                                    start_segment + f_start[peak_frames[i]] - fl
+                                )
+                                grouped_frames[v]["start"].append(start_vowel)
+                                grouped_frames[v]["stop"].append(start_vowel + fl)
+
     return grouped_frames
