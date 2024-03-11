@@ -66,6 +66,8 @@ def split_frames(x, fl, Fs, overlap=0, vol_thr=0, print_info=False):
 
 def wavScaler(x):
     """Scales a signal to wavfile integer range"""
+    if np.max(np.abs(x)) == 0:
+        return np.int16(x)
     return np.int16(x / np.max(np.abs(x)) * np.iinfo(np.int16).max)
 
 
@@ -317,7 +319,8 @@ def segment_by_words(list_of_words, audio, Fs, vowel_set, min_conf=1, signal_pad
 
     ## Returns
     segments: ndarray
-    vowels_per_segment: list"""
+    vowels_per_segment: list
+    s_start: list"""
     if not type(list_of_words[0] == dict):
         raise Exception("expects a dict for each word")
     segments = []
@@ -467,7 +470,7 @@ def julgran(words, audio, Fs, fl, add_context=False, long_frame=False):
                 segment = np.concatenate((np.zeros(3 * fl), segment, np.zeros(3 * fl)))
 
                 frames, f_start = split_frames(
-                    segment, 3 * fl, Fs, vol_thr=0, overlap=int(2*fl)
+                    segment, 3 * fl, Fs, vol_thr=0, overlap=int(2 * fl)
                 )
                 peak_frames, hnr_frames = HNR_short(
                     frames, Fs, len(vowels), min_dist=False
@@ -568,6 +571,7 @@ def outlier_filter(grouped_frames, Fs):
 
 
 def get_start_stop_seconds(grouped_frames, fl, Fs):
+    """Not a good method"""
     starts_all = []
     for v in grouped_frames.keys():
         starts_all.extend(grouped_frames[v]["start"])
@@ -580,3 +584,21 @@ def get_start_stop_seconds(grouped_frames, fl, Fs):
     starts_all_seconds = starts_all / Fs
     stops_all_seconds = stops_all / Fs
     return starts_all_seconds, stops_all_seconds
+
+def score_vs_labels(starts, stops, labels_df):
+    """computes precision and recall, by comparing starts and stops with labels tmin, tmax
+    Does not consider which vowel it actually is"""
+    included = 0
+    for start, stop in zip(starts, stops):
+        included += labels_df.apply(
+            lambda x: (start > x.tmin) and (stop < x.tmax), axis=1
+        ).sum()
+
+    print(included)
+
+    prec = included / len(starts)
+    reca = included / len(labels_df)
+
+    print("Assuming Praat perfect and all vowels correctly classified:")
+    print("precision:", prec)
+    print("recall:", included / len(labels_df))
