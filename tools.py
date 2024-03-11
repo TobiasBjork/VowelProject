@@ -10,11 +10,12 @@ from scipy.io.wavfile import read as readwav
 from scipy.io.wavfile import write as writewav
 from Signal_Analysis.features.signal import get_F_0, get_HNR
 from vosk import KaldiRecognizer, Model, SetLogLevel
+from sklearn import preprocessing, ensemble
 
 from folderFunctions import *
 
 # constants
-VOWELS_SV = {"e", "y", "u", "i", "o", "å", "a", "ö", "ä"}
+VOWELS_SV = ("e", "y", "u", "i", "o", "å", "a", "ö", "ä")
 
 
 def vol(x):
@@ -389,11 +390,14 @@ def HNR_peaks(audio, Fs, n_peaks=-1, plotit=False):
     return frames, peaks_prop, peaks, peak_sounds
 
 
-def HNR_short(frames, Fs, n_peaks=-1):
+def HNR_short(frames, Fs, n_peaks=-1, min_dist=True):
     """get frame index for peaks and hnr per frame"""
     hnr_frames = np.array([get_HNR(f, Fs) for f in frames])
 
-    min_distance = max(len(frames) / (n_peaks + 2), 1)  # frames
+    if min_dist:
+        min_distance = max(len(frames) / (n_peaks + 2), 1)  # frames
+    else:
+        min_distance = 1
     peaks, peaks_prop = signal.find_peaks(
         hnr_frames,
         height=0.1 * max(hnr_frames),
@@ -442,7 +446,7 @@ def normalize_std(x):
         return x / np.std(x)
 
 
-def julgran(words, audio, Fs, fl, add_context=False):
+def julgran(words, audio, Fs, fl, add_context=False, long_frame=False):
     grouped_frames = {v: {} for v in VOWELS_SV}
 
     # initialize lists
@@ -459,34 +463,120 @@ def julgran(words, audio, Fs, fl, add_context=False):
     ):
         if w["conf"] >= 1:
             # zero padding
-            segment = np.concatenate((np.zeros(fl), segment, np.zeros(fl)))
-            frames, f_start = split_frames(segment, fl, Fs, vol_thr=0, overlap=0)
-            peak_frames, hnr_frames = HNR_short(frames, Fs, len(vowels))
+            if long_frame:
+                segment = np.concatenate((np.zeros(3 * fl), segment, np.zeros(3 * fl)))
+
+                frames, f_start = split_frames(
+                    segment, 3 * fl, Fs, vol_thr=0, overlap=int(2*fl)
+                )
+                peak_frames, hnr_frames = HNR_short(
+                    frames, Fs, len(vowels), min_dist=False
+                )
+            else:
+                segment = np.concatenate((np.zeros(fl), segment, np.zeros(fl)))
+
+                frames, f_start = split_frames(
+                    segment, fl, Fs, vol_thr=0, overlap=int(0)
+                )
+                peak_frames, hnr_frames = HNR_short(frames, Fs, len(vowels))
+
+            # Check all vowels in word before keeping frames
+            keep_word = False
             if len(peak_frames) == len(vowels):
+                keep_word = True
                 for i, v in enumerate(vowels):
                     frame = frames[peak_frames[i]]
-                    if not checkIfWhite(frame, wNoiseRatio=0.5):
-                        if vol_db(frame) > 30:
-                            if np.sum(abs(frame) < 0.1 * max(frame)) / len(frame) < 0.5:
-                                if add_context:
-                                    grouped_frames[v]["frame"].append(
-                                        stitch_frames(
-                                            frames[
-                                                max(peak_frames[i] - 2, 0) : min(
-                                                    peak_frames[i] + 2, len(frames)
-                                                )
-                                            ]
-                                        )
+                    noise_check = not checkIfWhite(frame, wNoiseRatio=0.5)
+                    vol_check = vol_db(frame) > 45
+                    zero_check = (
+                        np.sum(abs(frame) < 0.1 * max(frame)) / len(frame) < 0.5
+                    )
+                    if not (noise_check and vol_check and zero_check):
+                        keep_word = False
+
+            if not keep_word:
+                print("trash", w["word"])
+            if keep_word:
+                print("keep", w["word"])
+
+                for i, v in enumerate(vowels):
+                    if add_context:
+                        grouped_frames[v]["frame"].append(
+                            stitch_frames(
+                                frames[
+                                    max(peak_frames[i] - 2, 0) : min(
+                                        peak_frames[i] + 2, len(frames)
                                     )
-                                else:
-                                    grouped_frames[v]["frame"].append(
-                                        frames[peak_frames[i]]
+                                ]
+                            )
+                        )
+                    else:
+                        if long_frame:
+                            f_long = frames[peak_frames[i]]
+
+                            grouped_frames[v]["frame"].append(
+                                f_long[
+                                    int(len(f_long) / 2 - fl / 2) : int(
+                                        len(f_long) / 2 + fl / 2
                                     )
-                                # start and stop (of real frame) (-fl compensates zeropadding)
-                                start_vowel = (
-                                    start_segment + f_start[peak_frames[i]] - fl
-                                )
-                                grouped_frames[v]["start"].append(start_vowel)
-                                grouped_frames[v]["stop"].append(start_vowel + fl)
+                                ]
+                            )
+                            start_vowel = (
+                                start_segment
+                                + f_start[peak_frames[i]]
+                                - 3 * fl
+                                + len(f_long) / 2
+                                - fl / 2
+                            )
+
+                        else:
+                            grouped_frames[v]["frame"].append(frames[peak_frames[i]])
+                            # start and stop (of real frame) (-fl compensates zeropadding)
+                            start_vowel = start_segment + f_start[peak_frames[i]] - fl
+
+                        grouped_frames[v]["start"].append(start_vowel)
+                        grouped_frames[v]["stop"].append(start_vowel + fl)
 
     return grouped_frames
+
+
+def outlier_filter(grouped_frames, Fs):
+    grouped_features = {v: [] for v in VOWELS_SV}
+    frames_inlier = {v: [] for v in VOWELS_SV}
+
+    for v in VOWELS_SV:
+        for f in grouped_frames[v]["frame"]:
+            mfcc = get_mfcc(f, Fs, n=5, normalize=True)
+            feat_vec = np.concatenate((mfcc, f))
+            grouped_features[v].append(feat_vec)
+
+        X = np.array(grouped_features[v])
+
+        sc_X = preprocessing.StandardScaler()
+        X = sc_X.fit_transform(X)
+        clf = ensemble.IsolationForest(random_state=0)
+        clf.fit(X)
+
+        inliers = clf.predict(X) > 0
+        frames_inlier[v] = {
+            k: [grouped_frames[v][k][i] for i in range(len(inliers)) if inliers[i]]
+            for k in grouped_frames[v].keys()
+        }
+        print(f"inliers ({v}): {np.around(100*sum(inliers)/len(X))} %")
+
+    return frames_inlier
+
+
+def get_start_stop_seconds(grouped_frames, fl, Fs):
+    starts_all = []
+    for v in grouped_frames.keys():
+        starts_all.extend(grouped_frames[v]["start"])
+    starts_all = np.array(starts_all)
+
+    print("total found vowels:", len(starts_all))
+    print("unique start points:", len(np.unique(starts_all)))
+    starts_all = np.sort(starts_all)
+    stops_all = starts_all + fl
+    starts_all_seconds = starts_all / Fs
+    stops_all_seconds = stops_all / Fs
+    return starts_all_seconds, stops_all_seconds
