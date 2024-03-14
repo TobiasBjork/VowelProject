@@ -32,7 +32,8 @@ def envelope(s, dmax=1, smoothing=10):
 
     # global max of dmax-chunks of locals max
     lmax = lmax[
-        [i + np.argmax(s[lmax[i : i + dmax]]) for i in range(0, len(lmax), dmax)]
+        [i + np.argmax(s[lmax[i: i + dmax]])
+         for i in range(0, len(lmax), dmax)]
     ]
     tt = np.arange(len(s))
     interp = interpolate.CubicSpline(tt[lmax], s[lmax])
@@ -51,7 +52,7 @@ def split_frames(x, fl, Fs, overlap=0, vol_thr=0, print_info=False):
     # frame start indices
     f_start = np.arange(0, len(x), fl - overlap)
     # list of frames
-    frames = [x[s : s + fl] for s in f_start]
+    frames = [x[s: s + fl] for s in f_start]
     frames = [f * (vol(f) > vol_thr) for f in frames]
 
     if print_info:
@@ -124,13 +125,14 @@ def movmean_peak(sequence, lag=5, thr=1, peak_infl=0.1, duration=1):
 
     for i in range(lag, len(sequence)):
         y = sequence[i]
-        avg = np.mean(processed_seq[i - lag : i])
-        std = np.std(processed_seq[i - lag : i])
+        avg = np.mean(processed_seq[i - lag: i])
+        std = np.std(processed_seq[i - lag: i])
 
         if y - avg > std * thr:
             is_peak.append(True)
             # calculate next step from peak or last value?
-            processed_seq.append(peak_infl * y + (1 - peak_infl) * processed_seq[i - 1])
+            processed_seq.append(
+                peak_infl * y + (1 - peak_infl) * processed_seq[i - 1])
         else:
             is_peak.append(False)
             processed_seq.append(y)
@@ -143,7 +145,7 @@ def movmean_peak(sequence, lag=5, thr=1, peak_infl=0.1, duration=1):
         else:
             if in_len < duration:
                 # remove previous peak if too short
-                is_peak[i - in_len : i] = [
+                is_peak[i - in_len: i] = [
                     False,
                 ] * in_len
             in_len = 0
@@ -331,7 +333,8 @@ def segment_by_words(list_of_words, audio, Fs, vowel_set, min_conf=1, signal_pad
         start = round(
             max(word["start"] * Fs - signal_pad * Fs, 0)
         )  # start of word (sample)
-        end = round(min(word["end"] * Fs + signal_pad * Fs, len(audio)))  # end of word.
+        # end of word.
+        end = round(min(word["end"] * Fs + signal_pad * Fs, len(audio)))
         a = audio[start:end]
 
         segments.append(a)
@@ -379,7 +382,7 @@ def HNR_peaks(audio, Fs, n_peaks=-1, plotit=False):
         start = int((Fs * tt_frames_center[peaks[i]] - width[i] / 2 * fl))
         end = int((Fs * tt_frames_center[peaks[i]] + width[i] / 2 * fl))
 
-        peak_sounds.append(audio[max(0, start) : min(end, len(audio))])
+        peak_sounds.append(audio[max(0, start): min(end, len(audio))])
 
     if plotit:
         plt.figure(figsize=(15, 5))
@@ -417,7 +420,8 @@ def extractVowels(segments, vowels_segments, Fs, language, id):
         frames, peaks_prop, peaks, peaks_sounds = HNR_peaks(segments[i], Fs)
         if len(peaks) == len(vowels_segments[i]):
             for j in range(len(peaks)):
-                updateFolder(language, peaks_sounds[j], vowels_segments[i][j], id, Fs)
+                updateFolder(
+                    language, peaks_sounds[j], vowels_segments[i][j], id, Fs)
 
 
 def get_mfcc(x, Fs, n=50, normalize=True):
@@ -426,7 +430,8 @@ def get_mfcc(x, Fs, n=50, normalize=True):
     if isinstance(x, list):
         return [
             np.mean(
-                lib.feature.mfcc(y=normalize_std(xi), sr=Fs, n_mfcc=n, n_fft=512).T,
+                lib.feature.mfcc(y=normalize_std(xi), sr=Fs,
+                                 n_mfcc=n, n_fft=512).T,
                 axis=0,
             )
             for xi in x
@@ -434,7 +439,8 @@ def get_mfcc(x, Fs, n=50, normalize=True):
     else:
         if normalize:
             return np.mean(
-                lib.feature.mfcc(y=normalize_std(x), sr=Fs, n_mfcc=n, n_fft=512).T,
+                lib.feature.mfcc(y=normalize_std(x), sr=Fs,
+                                 n_mfcc=n, n_fft=512).T,
                 axis=0,
             )
         else:
@@ -467,7 +473,8 @@ def julgran(words, audio, Fs, fl, add_context=False, long_frame=False):
         if w["conf"] >= 1:
             # zero padding
             if long_frame:
-                segment = np.concatenate((np.zeros(3 * fl), segment, np.zeros(3 * fl)))
+                segment = np.concatenate(
+                    (np.zeros(3 * fl), segment, np.zeros(3 * fl)))
 
                 frames, f_start = split_frames(
                     segment, 3 * fl, Fs, vol_thr=0, overlap=int(2 * fl)
@@ -492,7 +499,8 @@ def julgran(words, audio, Fs, fl, add_context=False, long_frame=False):
                     noise_check = not checkIfWhite(frame, wNoiseRatio=0.5)
                     vol_check = vol_db(frame) > 45
                     zero_check = (
-                        np.sum(abs(frame) < 0.1 * max(frame)) / len(frame) < 0.5
+                        np.sum(abs(frame) < 0.1 * max(frame)) /
+                        len(frame) < 0.5
                     )
                     if not (noise_check and vol_check and zero_check):
                         keep_word = False
@@ -507,7 +515,7 @@ def julgran(words, audio, Fs, fl, add_context=False, long_frame=False):
                         grouped_frames[v]["frame"].append(
                             stitch_frames(
                                 frames[
-                                    max(peak_frames[i] - 2, 0) : min(
+                                    max(peak_frames[i] - 2, 0): min(
                                         peak_frames[i] + 2, len(frames)
                                     )
                                 ]
@@ -519,7 +527,7 @@ def julgran(words, audio, Fs, fl, add_context=False, long_frame=False):
 
                             grouped_frames[v]["frame"].append(
                                 f_long[
-                                    int(len(f_long) / 2 - fl / 2) : int(
+                                    int(len(f_long) / 2 - fl / 2): int(
                                         len(f_long) / 2 + fl / 2
                                     )
                                 ]
@@ -533,12 +541,14 @@ def julgran(words, audio, Fs, fl, add_context=False, long_frame=False):
                             )
 
                         else:
-                            grouped_frames[v]["frame"].append(frames[peak_frames[i]])
+                            grouped_frames[v]["frame"].append(
+                                frames[peak_frames[i]])
                             # start and stop (of real frame) (-fl compensates zeropadding)
-                            start_vowel = start_segment + f_start[peak_frames[i]] - fl
+                            start_vowel = start_segment + \
+                                f_start[peak_frames[i]] - fl
 
-                        grouped_frames[v]["start"].append(start_vowel)
-                        grouped_frames[v]["stop"].append(start_vowel + fl)
+                        grouped_frames[v]["start"].append(start_vowel/Fs)
+                        grouped_frames[v]["stop"].append((start_vowel + fl)/Fs)
 
     return grouped_frames
 
@@ -562,7 +572,8 @@ def outlier_filter(grouped_frames, Fs):
 
         inliers = clf.predict(X) > 0
         frames_inlier[v] = {
-            k: [grouped_frames[v][k][i] for i in range(len(inliers)) if inliers[i]]
+            k: [grouped_frames[v][k][i]
+                for i in range(len(inliers)) if inliers[i]]
             for k in grouped_frames[v].keys()
         }
         print(f"inliers ({v}): {np.around(100*sum(inliers)/len(X))} %")
@@ -603,26 +614,33 @@ def groupedframes_to_lists(grouped_frames):
     print("unique start points:", len(np.unique(starts_all)))
     print("unique stop points:", len(np.unique(stops_all)))
 
-    starts_all = np.sort(starts_all)
-    stops_all = np.sort(stops_all)
+    indx = np.argsort(starts_all)
+    starts_all = starts_all[indx]
+    stops_all = stops_all[indx]
+    vowels_all = [vowels_all[i] for i in indx]
     return starts_all, stops_all, vowels_all
 
 
-def score_vs_labels(starts, stops, labels_df, vowels = None, snäll=False):
+def score_vs_labels(starts, stops, labels_df, vowels=None, snäll=False):
     """computes precision and recall, by comparing starts and stops with labels tmin, tmax
     TODO: Optionally considers vowel classification"""
     included = 0
-    for start, stop in zip(starts, stops):
+    for start, stop,vowel in zip(starts, stops, vowels):
         if not snäll:
-            included += labels_df.apply(
-                lambda x: (start >= x.tmin) and (stop <= x.tmax), axis=1
-            ).sum()
+            f = lambda x: (start >= x.tmin) and (stop <= x.tmax)
         else:
-            included += labels_df.apply(
-                lambda x: ((start >= x.tmin) and (start <= x.tmax))
-                or ((stop >= x.tmin) and (stop <= x.tmax)),
-                axis=1,
-            ).sum()
+            f = lambda x: ((start >= x.tmin) and (start <= x.tmax)) or ((stop >= x.tmin) and (stop <= x.tmax))
+            
+        bol = labels_df.apply(
+            f,
+            axis=1,
+        )
+        if bol.sum() == 1:
+            indx = bol.idxmax()
+            correct_vowel = labels_df['vowel'][indx]
+            if correct_vowel == vowel:
+                included +=1
+            
 
     print("included:", included)
 
