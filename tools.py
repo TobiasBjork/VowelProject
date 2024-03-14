@@ -213,8 +213,8 @@ def preprocess(path_input: str, path_output="audio_preproc", bpfilt=None):
     name = path.split(path_input[:-4])[-1]
     print(f"preprocessing {name}")
 
-    if not path_input[-4:] == ".wav":
-        raise Exception("not a wav-file")
+    # if not path_input[-4:] == ".wav":
+    #     raise Exception("not a wav-file")
 
     Fs, x = readwav(path_input)
 
