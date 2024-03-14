@@ -624,8 +624,8 @@ def groupedframes_to_lists(grouped_frames):
 def score_vs_labels(starts, stops, labels_df, vowels=None, snäll=False):
     """computes precision and recall, by comparing starts and stops with labels tmin, tmax
     TODO: Optionally considers vowel classification"""
-    included = 0
-    for start, stop,vowel in zip(starts, stops, vowels):
+    included = 0 
+    for i,(start, stop) in enumerate(zip(starts, stops)):
         if not snäll:
             f = lambda x: (start >= x.tmin) and (stop <= x.tmax)
         else:
@@ -636,13 +636,16 @@ def score_vs_labels(starts, stops, labels_df, vowels=None, snäll=False):
             axis=1,
         )
         if bol.sum() == 1:
-            indx = bol.idxmax()
-            correct_vowel = labels_df['vowel'][indx]
-            if correct_vowel == vowel:
-                included +=1
+            if vowels:
+                indx = bol.idxmax()
+                correct_vowel = labels_df['vowel'][indx]
+                if correct_vowel == vowels[i]:
+                    included +=1
+                else:
+                    print('We got',vowels[i])
+                    print('Correct vowel',correct_vowel)
             else:
-                print('We got',vowel)
-                print('Correct vowel',correct_vowel)
+                included +=1
             
 
     print("included:", included)
