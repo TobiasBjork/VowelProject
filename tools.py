@@ -630,7 +630,7 @@ def score_vs_labels(starts, stops, labels_df, vowels=None, snäll=False):
             f = lambda x: (start >= x.tmin) and (stop <= x.tmax)
         else:
             f = lambda x: ((start >= x.tmin) and (start <= x.tmax)) or ((stop >= x.tmin) and (stop <= x.tmax))
-            
+
         bol = labels_df.apply(
             f,
             axis=1,
@@ -640,6 +640,9 @@ def score_vs_labels(starts, stops, labels_df, vowels=None, snäll=False):
             correct_vowel = labels_df['vowel'][indx]
             if correct_vowel == vowel:
                 included +=1
+            else:
+                print('We got',vowel)
+                print('Correct vowel',correct_vowel)
             
 
     print("included:", included)
@@ -647,6 +650,6 @@ def score_vs_labels(starts, stops, labels_df, vowels=None, snäll=False):
     prec = included / len(starts)
     reca = included / len(labels_df)
 
-    print("Assuming Praat perfect and all vowels correctly classified:")
+    print("Assuming Tobias.exe perfect and all vowels correctly classified:")
     print("precision:", prec)
     print("recall:", reca)
