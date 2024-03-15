@@ -23,17 +23,18 @@ def vol(x):
 
 
 def vol_db(x, ref=1):
+    """Return mean decibel volume."""
     return 10 * np.log10(np.mean(x**2) / ref)
 
 
 def envelope(s, dmax=1, smoothing=10):
+    """Return max-envelope of a signal."""
     # locals max
     lmax = (np.diff(np.sign(np.diff(s))) < 0).nonzero()[0] + 1
 
     # global max of dmax-chunks of locals max
     lmax = lmax[
-        [i + np.argmax(s[lmax[i: i + dmax]])
-         for i in range(0, len(lmax), dmax)]
+        [i + np.argmax(s[lmax[i : i + dmax]]) for i in range(0, len(lmax), dmax)]
     ]
     tt = np.arange(len(s))
     interp = interpolate.CubicSpline(tt[lmax], s[lmax])
@@ -52,7 +53,7 @@ def split_frames(x, fl, Fs, overlap=0, vol_thr=0, print_info=False):
     # frame start indices
     f_start = np.arange(0, len(x), fl - overlap)
     # list of frames
-    frames = [x[s: s + fl] for s in f_start]
+    frames = [x[s : s + fl] for s in f_start]
     frames = [f * (vol(f) > vol_thr) for f in frames]
 
     if print_info:
@@ -66,14 +67,14 @@ def split_frames(x, fl, Fs, overlap=0, vol_thr=0, print_info=False):
 
 
 def wavScaler(x):
-    """Scales a signal to wavfile integer range"""
+    """Scale a signal to wavfile integer range"""
     if np.max(np.abs(x)) == 0:
         return np.int16(x)
     return np.int16(x / np.max(np.abs(x)) * np.iinfo(np.int16).max)
 
 
 def stitch_frames(frames, fade_pow=0.0, padding=0):
-    """concatenate frames together, with optional fading and padding (samples silence) between frames.
+    """Concatenate frames together, with optional fading and padding (samples silence) between frames.
     Also scales to wav-integer"""
 
     if fade_pow > 0:
@@ -125,14 +126,13 @@ def movmean_peak(sequence, lag=5, thr=1, peak_infl=0.1, duration=1):
 
     for i in range(lag, len(sequence)):
         y = sequence[i]
-        avg = np.mean(processed_seq[i - lag: i])
-        std = np.std(processed_seq[i - lag: i])
+        avg = np.mean(processed_seq[i - lag : i])
+        std = np.std(processed_seq[i - lag : i])
 
         if y - avg > std * thr:
             is_peak.append(True)
             # calculate next step from peak or last value?
-            processed_seq.append(
-                peak_infl * y + (1 - peak_infl) * processed_seq[i - 1])
+            processed_seq.append(peak_infl * y + (1 - peak_infl) * processed_seq[i - 1])
         else:
             is_peak.append(False)
             processed_seq.append(y)
@@ -145,7 +145,7 @@ def movmean_peak(sequence, lag=5, thr=1, peak_infl=0.1, duration=1):
         else:
             if in_len < duration:
                 # remove previous peak if too short
-                is_peak[i - in_len: i] = [
+                is_peak[i - in_len : i] = [
                     False,
                 ] * in_len
             in_len = 0
@@ -197,24 +197,24 @@ def plotPeaks(audio, frame_center, frames_start, hnr_frames, peaks_prop, peaks, 
 
 
 def preprocess(path_input: str, path_output="audio_preproc", bpfilt=None):
-    """Preprocess one audio file
+    """Preprocess one audio file, save and return as array.
 
     - mono channel
     - normalize volume
     - bandpass filter
 
-    Parameters
-    ----------
-    path_input: path to file
-    path_output: path to folder for output
-    bpfilt: low and high cutoff for filter. Default none
+    ## Parameters
+
+    path_input (str): path to file.
+    path_output (str): path to folder for output.
+    bpfilt (tuple): low and high cutoff (Hz) for filter (default None).
     """
 
     name = path.split(path_input[:-4])[-1]
     print(f"preprocessing {name}")
 
-    if not path_input[-4:] == ".wav":
-        raise Exception("not a wav-file")
+    # if not path_input[-4:] == ".wav":
+    #     raise Exception("not a wav-file")
 
     Fs, x = readwav(path_input)
 
@@ -250,7 +250,13 @@ def preprocess(path_input: str, path_output="audio_preproc", bpfilt=None):
 def rec_vosk(audio_path: str, model, print_summary=True) -> list[dict]:
     """Recognize speech in a audio file, using a provided vosk-model
 
-    returns: words (list of dicts) contains the word, start, end, conf"""
+    ## Parameters
+    audio_path (str): Path to audio file. Should be a single channel wav-file.
+    model (vosk.Model): A vosk-model object.
+    print_summary (bool): Optionally print a summary of each found word.
+
+    ## Returns
+    words (list of dicts): contains the word, start, end, conf"""
     wf = wave.open(audio_path, "rb")
 
     rec = KaldiRecognizer(model, wf.getframerate())
@@ -303,18 +309,22 @@ def print_w(i, w):
     )
 
 
-def checkVowels(word, vowels):
-    """Returns list of found vowels in a word"""
+def checkVowels(word: str, vowels):
+    """Return a list of vowels in a word"""
     foundVowels = [letter for letter in word if letter in vowels]
     return foundVowels
 
 
 def segment_by_words(list_of_words, audio, Fs, vowel_set, min_conf=1, signal_pad=0):
-    """splits an audio into segments, by vosk words.
-    ## Parameters:
+    """Split an audio array into segments, by vosk words.
 
-    zero_padd: boolean
-        Add one zero on each side of segment
+    ## Parameters:
+    list_of_words (list[dict]): Output from ``rec_vosk``.
+    audio (ndarray)
+    Fs: Sampling frequency
+    vowel_set (tuple): Vowels considered
+
+    TODO: Remove vowels output here?
 
     signal_pad: int
         add extra seconds from signal on each side of segment
@@ -346,8 +356,13 @@ def segment_by_words(list_of_words, audio, Fs, vowel_set, min_conf=1, signal_pad
 
 def checkIfWhite(signal, wNoiseRatio=0.8):
     """Checks if input signal noisy
-    ## returns
-    white: bool"""
+
+    ## Parameters
+    signal (ndarray)
+    wNoiseRatio (float): minimum ratio of ...
+
+    ## Returns
+    white (bool)"""
     sum0, sum1 = 0, 0
     for i in range(1, len(signal)):
         sum0 += abs(signal[i])
@@ -355,7 +370,8 @@ def checkIfWhite(signal, wNoiseRatio=0.8):
     return sum1 / sum0 > wNoiseRatio
 
 
-def HNR_peaks(audio, Fs, n_peaks=-1, plotit=False):
+def HNR_peaks_old(audio, Fs, n_peaks=-1, plotit=False):
+    """ser inte ut som vi använder någonstans"""
     tt = np.linspace(0, len(audio) / Fs, len(audio))
     fl = int(0.08 * Fs)
     frames, frames_start = split_frames(audio, fl, Fs, overlap=int(6 * fl / 8))
@@ -382,7 +398,7 @@ def HNR_peaks(audio, Fs, n_peaks=-1, plotit=False):
         start = int((Fs * tt_frames_center[peaks[i]] - width[i] / 2 * fl))
         end = int((Fs * tt_frames_center[peaks[i]] + width[i] / 2 * fl))
 
-        peak_sounds.append(audio[max(0, start): min(end, len(audio))])
+        peak_sounds.append(audio[max(0, start) : min(end, len(audio))])
 
     if plotit:
         plt.figure(figsize=(15, 5))
@@ -396,14 +412,23 @@ def HNR_peaks(audio, Fs, n_peaks=-1, plotit=False):
     return frames, peaks_prop, peaks, peak_sounds
 
 
-def HNR_short(frames, Fs, n_peaks=-1, min_dist=True):
-    """get frame index for peaks and hnr per frame"""
+def HNR_peaks(frames, Fs, n_peaks=-1, min_dist=True):
+    """Get frame index for peaks and hnr per frame
+    
+    ## Parameters
+    frames (list[ndarray]): Audio frames
+    Fs (int): Sampling frequency
+    n_peaks (int): Maximum number of peaks to find
+    min_dist (bool): If true, no two peaks can be closer than ``len(frames)/(n_peaks+2)``.
+    """
     hnr_frames = np.array([get_HNR(f, Fs) for f in frames])
 
     if min_dist:
         min_distance = max(len(frames) / (n_peaks + 2), 1)  # frames
     else:
         min_distance = 1
+
+    # find peaks
     peaks, peaks_prop = signal.find_peaks(
         hnr_frames,
         height=0.1 * max(hnr_frames),
@@ -420,18 +445,16 @@ def extractVowels(segments, vowels_segments, Fs, language, id):
         frames, peaks_prop, peaks, peaks_sounds = HNR_peaks(segments[i], Fs)
         if len(peaks) == len(vowels_segments[i]):
             for j in range(len(peaks)):
-                updateFolder(
-                    language, peaks_sounds[j], vowels_segments[i][j], id, Fs)
+                updateFolder(language, peaks_sounds[j], vowels_segments[i][j], id, Fs)
 
 
 def get_mfcc(x, Fs, n=50, normalize=True):
-    """Compute n first MFCCoefficients,
+    """Compute n first MFC Coefficients,
     for a list of segments it returns coefficient for every (normalized) segment"""
     if isinstance(x, list):
         return [
             np.mean(
-                lib.feature.mfcc(y=normalize_std(xi), sr=Fs,
-                                 n_mfcc=n, n_fft=512).T,
+                lib.feature.mfcc(y=normalize_std(xi), sr=Fs, n_mfcc=n, n_fft=512).T,
                 axis=0,
             )
             for xi in x
@@ -439,8 +462,7 @@ def get_mfcc(x, Fs, n=50, normalize=True):
     else:
         if normalize:
             return np.mean(
-                lib.feature.mfcc(y=normalize_std(x), sr=Fs,
-                                 n_mfcc=n, n_fft=512).T,
+                lib.feature.mfcc(y=normalize_std(x), sr=Fs, n_mfcc=n, n_fft=512).T,
                 axis=0,
             )
         else:
@@ -455,7 +477,28 @@ def normalize_std(x):
         return x / np.std(x)
 
 
-def julgran(words, audio, Fs, fl, add_context=False, long_frame=False):
+def extract_vowels(
+    words,
+    audio,
+    Fs,
+    fl,
+    white_thr=0.5,
+    vol_thr=45,
+    zero_thr=0.5,
+    zero_pad=True,
+    add_context=False,
+    long_frame=False,
+    plot_word="",
+):
+    """Extract vowels from audio.
+
+    ## Parameters
+
+    ## Returns
+
+
+    """
+    # output structure
     grouped_frames = {v: {} for v in VOWELS_SV}
 
     # initialize lists
@@ -473,22 +516,25 @@ def julgran(words, audio, Fs, fl, add_context=False, long_frame=False):
         if w["conf"] >= 1:
             # zero padding
             if long_frame:
-                segment = np.concatenate(
-                    (np.zeros(3 * fl), segment, np.zeros(3 * fl)))
+                if zero_pad:
+                    segment = np.concatenate(
+                        (np.zeros(3 * fl), segment, np.zeros(3 * fl))
+                    )
 
                 frames, f_start = split_frames(
                     segment, 3 * fl, Fs, vol_thr=0, overlap=int(2 * fl)
                 )
-                peak_frames, hnr_frames = HNR_short(
+                peak_frames, hnr_frames = HNR_peaks(
                     frames, Fs, len(vowels), min_dist=False
                 )
             else:
-                segment = np.concatenate((np.zeros(fl), segment, np.zeros(fl)))
+                if zero_pad:
+                    segment = np.concatenate((np.zeros(fl), segment, np.zeros(fl)))
 
                 frames, f_start = split_frames(
                     segment, fl, Fs, vol_thr=0, overlap=int(0)
                 )
-                peak_frames, hnr_frames = HNR_short(frames, Fs, len(vowels))
+                peak_frames, hnr_frames = HNR_peaks(frames, Fs, len(vowels))
 
             # Check all vowels in word before keeping frames
             keep_word = False
@@ -496,11 +542,10 @@ def julgran(words, audio, Fs, fl, add_context=False, long_frame=False):
                 keep_word = True
                 for i, v in enumerate(vowels):
                     frame = frames[peak_frames[i]]
-                    noise_check = not checkIfWhite(frame, wNoiseRatio=0.5)
-                    vol_check = vol_db(frame) > 45
+                    noise_check = not checkIfWhite(frame, wNoiseRatio=white_thr)
+                    vol_check = vol_db(frame) > vol_thr
                     zero_check = (
-                        np.sum(abs(frame) < 0.1 * max(frame)) /
-                        len(frame) < 0.5
+                        np.sum(abs(frame) < 0.1 * max(frame)) / len(frame) < zero_thr
                     )
                     if not (noise_check and vol_check and zero_check):
                         keep_word = False
@@ -512,22 +557,24 @@ def julgran(words, audio, Fs, fl, add_context=False, long_frame=False):
 
                 for i, v in enumerate(vowels):
                     if add_context:
+                        # If add_context, add a few frames in a row
                         grouped_frames[v]["frame"].append(
                             stitch_frames(
                                 frames[
-                                    max(peak_frames[i] - 2, 0): min(
-                                        peak_frames[i] + 2, len(frames)
+                                    max(peak_frames[i] - 2, 0) : min(
+                                        peak_frames[i] + 3, len(frames)
                                     )
                                 ]
                             )
                         )
                     else:
                         if long_frame:
+                            # add middle part of long frame
                             f_long = frames[peak_frames[i]]
 
                             grouped_frames[v]["frame"].append(
                                 f_long[
-                                    int(len(f_long) / 2 - fl / 2): int(
+                                    int(len(f_long) / 2 - fl / 2) : int(
                                         len(f_long) / 2 + fl / 2
                                     )
                                 ]
@@ -535,20 +582,36 @@ def julgran(words, audio, Fs, fl, add_context=False, long_frame=False):
                             start_vowel = (
                                 start_segment
                                 + f_start[peak_frames[i]]
-                                - 3 * fl
                                 + len(f_long) / 2
                                 - fl / 2
                             )
+                            if zero_pad:
+                                start_vowel -= 3 * fl
 
                         else:
-                            grouped_frames[v]["frame"].append(
-                                frames[peak_frames[i]])
+                            grouped_frames[v]["frame"].append(frames[peak_frames[i]])
                             # start and stop (of real frame) (-fl compensates zeropadding)
-                            start_vowel = start_segment + \
-                                f_start[peak_frames[i]] - fl
+                            start_vowel = start_segment + f_start[peak_frames[i]]
+                            if zero_pad:
+                                start_vowel -= fl
 
-                        grouped_frames[v]["start"].append(start_vowel/Fs)
-                        grouped_frames[v]["stop"].append((start_vowel + fl)/Fs)
+                        grouped_frames[v]["start"].append(start_vowel / Fs)
+                        grouped_frames[v]["stop"].append((start_vowel + fl) / Fs)
+            if w["word"] == plot_word:
+                plt.figure()
+                plt.plot(segment / segment.max(), label=f"""segment ({w["word"]})""")
+                plt.vlines(f_start, *plt.ylim())
+                plt.plot(
+                    f_start + fl / 2, hnr_frames / hnr_frames.max(), "*", label="HNR"
+                )
+                plt.plot(
+                    f_start[peak_frames] + fl / 2,
+                    hnr_frames[peak_frames] / hnr_frames.max(),
+                    "*r",
+                    label="chosen peaks",
+                )
+                plt.legend()
+                plt.show()
 
     return grouped_frames
 
@@ -572,8 +635,7 @@ def outlier_filter(grouped_frames, Fs):
 
         inliers = clf.predict(X) > 0
         frames_inlier[v] = {
-            k: [grouped_frames[v][k][i]
-                for i in range(len(inliers)) if inliers[i]]
+            k: [grouped_frames[v][k][i] for i in range(len(inliers)) if inliers[i]]
             for k in grouped_frames[v].keys()
         }
         print(f"inliers ({v}): {np.around(100*sum(inliers)/len(X))} %")
@@ -581,24 +643,8 @@ def outlier_filter(grouped_frames, Fs):
     return frames_inlier
 
 
-def get_start_stop_seconds(grouped_frames, fl, Fs):
-    """Not a good method (input is samples, output is seconds)"""
-    starts_all = []
-    for v in grouped_frames.keys():
-        starts_all.extend(grouped_frames[v]["start"])
-    starts_all = np.array(starts_all)
-
-    print("total found vowels:", len(starts_all))
-    print("unique start points:", len(np.unique(starts_all)))
-    starts_all = np.sort(starts_all)
-    stops_all = starts_all + fl
-    starts_all_seconds = starts_all / Fs
-    stops_all_seconds = stops_all / Fs
-    return starts_all_seconds, stops_all_seconds
-
-
 def groupedframes_to_lists(grouped_frames):
-    """Convert a grouped_frames to three lists"""
+    """Convert a grouped_frames dictionary to three lists"""
     starts_all = []
     stops_all = []
     vowels_all = []
@@ -621,15 +667,38 @@ def groupedframes_to_lists(grouped_frames):
     return starts_all, stops_all, vowels_all
 
 
-def score_vs_labels(starts, stops, labels_df, vowels=None, snäll=False):
-    """computes precision and recall, by comparing starts and stops with labels tmin, tmax
-    TODO: Optionally considers vowel classification"""
-    included = 0 
-    for i,(start, stop) in enumerate(zip(starts, stops)):
-        if not snäll:
-            f = lambda x: (start >= x.tmin) and (stop <= x.tmax)
+def score_vs_labels(starts, stops, labels_df, vowels=None, accept_partial=False):
+    """Compute precision and recall, for timestamps, and optionally vowel classification.
+
+    ## Parameters
+    starts (list): List of model start points
+    stops (list): List of model stop points
+    labels_df (DataFrame): Reference timestamps and vowel labels (tmin,tmax,vowel).
+    accept_partial (bool): If true, a vowel is considered correct even if
+    only part of the intervals overlap.
+    vowels (list[str]): model vowels. If None, assume all to be correctly classified.
+
+    ## Returns
+    precision (float): How many of model vowels are correct?
+    recall (float): How many of reference vowels were found?
+    """
+    included = 0
+    print("Classification errors:")
+
+    for i, (start, stop) in enumerate(zip(starts, stops)):
+        if not accept_partial:
+
+            def f(x):
+                return start >= x.tmin and stop <= x.tmax
         else:
-            f = lambda x: ((start >= x.tmin) and (start <= x.tmax)) or ((stop >= x.tmin) and (stop <= x.tmax))
+
+            def f(x):
+                return (
+                    start >= x.tmin
+                    and start <= x.tmax
+                    or stop >= x.tmin
+                    and stop <= x.tmax
+                )
 
         bol = labels_df.apply(
             f,
@@ -638,21 +707,34 @@ def score_vs_labels(starts, stops, labels_df, vowels=None, snäll=False):
         if bol.sum() == 1:
             if vowels:
                 indx = bol.idxmax()
-                correct_vowel = labels_df['vowel'][indx]
+                correct_vowel = labels_df["vowel"][indx]
                 if correct_vowel == vowels[i]:
-                    included +=1
+                    included += 1
                 else:
-                    print('We got',vowels[i])
-                    print('Correct vowel',correct_vowel)
+                    print(f"- at {start}s:")
+                    print("    We got", vowels[i])
+                    print("    Correct vowel", correct_vowel)
             else:
-                included +=1
-            
+                included += 1
 
-    print("included:", included)
+    precision = included / len(starts)
+    recall = included / len(labels_df)
 
-    prec = included / len(starts)
-    reca = included / len(labels_df)
+    print("-"*30)
+    print(f"precision: {round(100*precision,3)}% ({included}/{len(starts)})")
+    print(f"recall: {round(100*recall,3)}% ({included}/{len(labels_df)})")
 
-    print("Assuming Tobias.exe perfect and all vowels correctly classified:")
-    print("precision:", prec)
-    print("recall:", reca)
+    return precision, recall
+
+def plot_intervals(audio, starts_all, stops_all, labels_df, Fs):
+    tt = np.arange(len(audio)) / Fs
+    plt.plot(tt, audio, alpha=0.6, label="audio")
+    plt.vlines(starts_all, *plt.ylim(), colors="r", label="Model output")
+    plt.vlines(labels_df.tmin, *plt.ylim(), colors="g", label="Reference ")
+    for tmin, tmax in zip(labels_df.tmin, labels_df.tmax):
+        plt.axvspan(tmin, tmax, alpha=0.5, color="g")
+
+    for start, stop in zip(starts_all, stops_all):
+        plt.axvspan(start, stop, alpha=0.3, color="r")
+
+    plt.xlabel("time (s)")
