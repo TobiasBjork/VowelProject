@@ -370,7 +370,8 @@ def checkIfWhite(signal, wNoiseRatio=0.8):
     return sum1 / sum0 > wNoiseRatio
 
 
-def HNR_peaks(audio, Fs, n_peaks=-1, plotit=False):
+def HNR_peaks_old(audio, Fs, n_peaks=-1, plotit=False):
+    """ser inte ut som vi använder någonstans"""
     tt = np.linspace(0, len(audio) / Fs, len(audio))
     fl = int(0.08 * Fs)
     frames, frames_start = split_frames(audio, fl, Fs, overlap=int(6 * fl / 8))
@@ -411,14 +412,23 @@ def HNR_peaks(audio, Fs, n_peaks=-1, plotit=False):
     return frames, peaks_prop, peaks, peak_sounds
 
 
-def HNR_short(frames, Fs, n_peaks=-1, min_dist=True):
-    """get frame index for peaks and hnr per frame"""
+def HNR_peaks(frames, Fs, n_peaks=-1, min_dist=True):
+    """Get frame index for peaks and hnr per frame
+    
+    ## Parameters
+    frames (list[ndarray]): Audio frames
+    Fs (int): Sampling frequency
+    n_peaks (int): Maximum number of peaks to find
+    min_dist (bool): If true, no two peaks can be closer than ``len(frames)/(n_peaks+2)``.
+    """
     hnr_frames = np.array([get_HNR(f, Fs) for f in frames])
 
     if min_dist:
         min_distance = max(len(frames) / (n_peaks + 2), 1)  # frames
     else:
         min_distance = 1
+
+    # find peaks
     peaks, peaks_prop = signal.find_peaks(
         hnr_frames,
         height=0.1 * max(hnr_frames),
@@ -439,7 +449,7 @@ def extractVowels(segments, vowels_segments, Fs, language, id):
 
 
 def get_mfcc(x, Fs, n=50, normalize=True):
-    """Compute n first MFCCoefficients,
+    """Compute n first MFC Coefficients,
     for a list of segments it returns coefficient for every (normalized) segment"""
     if isinstance(x, list):
         return [
@@ -514,7 +524,7 @@ def extract_vowels(
                 frames, f_start = split_frames(
                     segment, 3 * fl, Fs, vol_thr=0, overlap=int(2 * fl)
                 )
-                peak_frames, hnr_frames = HNR_short(
+                peak_frames, hnr_frames = HNR_peaks(
                     frames, Fs, len(vowels), min_dist=False
                 )
             else:
@@ -524,7 +534,7 @@ def extract_vowels(
                 frames, f_start = split_frames(
                     segment, fl, Fs, vol_thr=0, overlap=int(0)
                 )
-                peak_frames, hnr_frames = HNR_short(frames, Fs, len(vowels))
+                peak_frames, hnr_frames = HNR_peaks(frames, Fs, len(vowels))
 
             # Check all vowels in word before keeping frames
             keep_word = False
@@ -715,3 +725,16 @@ def score_vs_labels(starts, stops, labels_df, vowels=None, accept_partial=False)
     print(f"recall: {round(100*recall,3)}% ({included}/{len(labels_df)})")
 
     return precision, recall
+
+def plot_intervals(audio, starts_all, stops_all, labels_df, Fs):
+    tt = np.arange(len(audio)) / Fs
+    plt.plot(tt, audio, alpha=0.6, label="audio")
+    plt.vlines(starts_all, *plt.ylim(), colors="r", label="Model output")
+    plt.vlines(labels_df.tmin, *plt.ylim(), colors="g", label="Reference ")
+    for tmin, tmax in zip(labels_df.tmin, labels_df.tmax):
+        plt.axvspan(tmin, tmax, alpha=0.5, color="g")
+
+    for start, stop in zip(starts_all, stops_all):
+        plt.axvspan(start, stop, alpha=0.3, color="r")
+
+    plt.xlabel("time (s)")
