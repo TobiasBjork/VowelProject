@@ -482,7 +482,7 @@ def extract_vowels(
     audio,
     Fs,
     fl,
-    white_thr=0.5,
+    white_thr=0.8,
     vol_thr=45,
     zero_thr=0.5,
     zero_pad=True,
