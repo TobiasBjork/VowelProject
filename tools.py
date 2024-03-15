@@ -27,6 +27,7 @@ def vol_db(x, ref=1):
 
 
 def envelope(s, dmax=1, smoothing=10):
+    """Smoothed max-envelope of a signal"""
     # locals max
     lmax = (np.diff(np.sign(np.diff(s))) < 0).nonzero()[0] + 1
 
@@ -195,17 +196,17 @@ def plotPeaks(audio, frame_center, frames_start, hnr_frames, peaks_prop, peaks, 
 
 
 def preprocess(path_input: str, path_output="audio_preproc", bpfilt=None):
-    """Preprocess one audio file
+    """Preprocess one audio file, save and return as array.
 
     - mono channel
     - normalize volume
     - bandpass filter
 
-    Parameters
-    ----------
-    path_input: path to file
-    path_output: path to folder for output
-    bpfilt: low and high cutoff for filter. Default none
+    ## Parameters
+
+    path_input (str): path to file.
+    path_output (str): path to folder for output.
+    bpfilt (tuple): low and high cutoff (Hz) for filter (default None).
     """
 
     name = path.split(path_input[:-4])[-1]
@@ -247,8 +248,14 @@ def preprocess(path_input: str, path_output="audio_preproc", bpfilt=None):
 
 def rec_vosk(audio_path: str, model, print_summary=True) -> list[dict]:
     """Recognize speech in a audio file, using a provided vosk-model
+    
+    ## Parameters
+    audio_path (str): Path to audio file. Should be a single channel wav-file.
+    model (vosk.Model): A vosk-model object.
+    print_summary (bool): Optionally print a summary of each found word.
 
-    returns: words (list of dicts) contains the word, start, end, conf"""
+    ## Returns 
+    words (list of dicts): contains the word, start, end, conf"""
     wf = wave.open(audio_path, "rb")
 
     rec = KaldiRecognizer(model, wf.getframerate())
@@ -301,18 +308,22 @@ def print_w(i, w):
     )
 
 
-def checkVowels(word, vowels):
-    """Returns list of found vowels in a word"""
+def checkVowels(word:str, vowels):
+    """Return a list of vowels in a word"""
     foundVowels = [letter for letter in word if letter in vowels]
     return foundVowels
 
 
 def segment_by_words(list_of_words, audio, Fs, vowel_set, min_conf=1, signal_pad=0):
-    """splits an audio into segments, by vosk words.
-    ## Parameters:
+    """Split an audio array into segments, by vosk words.
 
-    zero_padd: boolean
-        Add one zero on each side of segment
+    ## Parameters:
+    list_of_words (list[dict]): Output from ``rec_vosk``.
+    audio (ndarray)
+    Fs: Sampling frequency
+    vowel_set (tuple): Vowels considered
+    
+    TODO: Remove vowels output here?
 
     signal_pad: int
         add extra seconds from signal on each side of segment
@@ -344,8 +355,13 @@ def segment_by_words(list_of_words, audio, Fs, vowel_set, min_conf=1, signal_pad
 
 def checkIfWhite(signal, wNoiseRatio=0.8):
     """Checks if input signal noisy
-    ## returns
-    white: bool"""
+
+    ## Parameters
+    signal (ndarray)
+    wNoiseRatio (float): minimum ratio of ...
+
+    ## Returns
+    white (bool)"""
     sum0, sum1 = 0, 0
     for i in range(1, len(signal)):
         sum0 += abs(signal[i])
