@@ -23,11 +23,12 @@ def vol(x):
 
 
 def vol_db(x, ref=1):
+    """Return mean decibel volume."""
     return 10 * np.log10(np.mean(x**2) / ref)
 
 
 def envelope(s, dmax=1, smoothing=10):
-    """Smoothed max-envelope of a signal"""
+    """Return max-envelope of a signal."""
     # locals max
     lmax = (np.diff(np.sign(np.diff(s))) < 0).nonzero()[0] + 1
 
@@ -66,14 +67,14 @@ def split_frames(x, fl, Fs, overlap=0, vol_thr=0, print_info=False):
 
 
 def wavScaler(x):
-    """Scales a signal to wavfile integer range"""
+    """Scale a signal to wavfile integer range"""
     if np.max(np.abs(x)) == 0:
         return np.int16(x)
     return np.int16(x / np.max(np.abs(x)) * np.iinfo(np.int16).max)
 
 
 def stitch_frames(frames, fade_pow=0.0, padding=0):
-    """concatenate frames together, with optional fading and padding (samples silence) between frames.
+    """Concatenate frames together, with optional fading and padding (samples silence) between frames.
     Also scales to wav-integer"""
 
     if fade_pow > 0:
@@ -248,13 +249,13 @@ def preprocess(path_input: str, path_output="audio_preproc", bpfilt=None):
 
 def rec_vosk(audio_path: str, model, print_summary=True) -> list[dict]:
     """Recognize speech in a audio file, using a provided vosk-model
-    
+
     ## Parameters
     audio_path (str): Path to audio file. Should be a single channel wav-file.
     model (vosk.Model): A vosk-model object.
     print_summary (bool): Optionally print a summary of each found word.
 
-    ## Returns 
+    ## Returns
     words (list of dicts): contains the word, start, end, conf"""
     wf = wave.open(audio_path, "rb")
 
@@ -308,7 +309,7 @@ def print_w(i, w):
     )
 
 
-def checkVowels(word:str, vowels):
+def checkVowels(word: str, vowels):
     """Return a list of vowels in a word"""
     foundVowels = [letter for letter in word if letter in vowels]
     return foundVowels
@@ -322,7 +323,7 @@ def segment_by_words(list_of_words, audio, Fs, vowel_set, min_conf=1, signal_pad
     audio (ndarray)
     Fs: Sampling frequency
     vowel_set (tuple): Vowels considered
-    
+
     TODO: Remove vowels output here?
 
     signal_pad: int
@@ -466,7 +467,28 @@ def normalize_std(x):
         return x / np.std(x)
 
 
-def julgran(words, audio, Fs, fl, add_context=False, long_frame=False, plot_word=""):
+def extract_vowels(
+    words,
+    audio,
+    Fs,
+    fl,
+    white_thr=0.5,
+    vol_thr=45,
+    zero_thr=0.5,
+    zero_pad=True,
+    add_context=False,
+    long_frame=False,
+    plot_word="",
+):
+    """Extract vowels from audio.
+
+    ## Parameters
+
+    ## Returns
+
+
+    """
+    # output structure
     grouped_frames = {v: {} for v in VOWELS_SV}
 
     # initialize lists
@@ -484,7 +506,10 @@ def julgran(words, audio, Fs, fl, add_context=False, long_frame=False, plot_word
         if w["conf"] >= 1:
             # zero padding
             if long_frame:
-                segment = np.concatenate((np.zeros(3 * fl), segment, np.zeros(3 * fl)))
+                if zero_pad:
+                    segment = np.concatenate(
+                        (np.zeros(3 * fl), segment, np.zeros(3 * fl))
+                    )
 
                 frames, f_start = split_frames(
                     segment, 3 * fl, Fs, vol_thr=0, overlap=int(2 * fl)
@@ -493,7 +518,8 @@ def julgran(words, audio, Fs, fl, add_context=False, long_frame=False, plot_word
                     frames, Fs, len(vowels), min_dist=False
                 )
             else:
-                segment = np.concatenate((np.zeros(fl), segment, np.zeros(fl)))
+                if zero_pad:
+                    segment = np.concatenate((np.zeros(fl), segment, np.zeros(fl)))
 
                 frames, f_start = split_frames(
                     segment, fl, Fs, vol_thr=0, overlap=int(0)
@@ -506,10 +532,10 @@ def julgran(words, audio, Fs, fl, add_context=False, long_frame=False, plot_word
                 keep_word = True
                 for i, v in enumerate(vowels):
                     frame = frames[peak_frames[i]]
-                    noise_check = not checkIfWhite(frame, wNoiseRatio=0.5)
-                    vol_check = vol_db(frame) > 45
+                    noise_check = not checkIfWhite(frame, wNoiseRatio=white_thr)
+                    vol_check = vol_db(frame) > vol_thr
                     zero_check = (
-                        np.sum(abs(frame) < 0.1 * max(frame)) / len(frame) < 0.5
+                        np.sum(abs(frame) < 0.1 * max(frame)) / len(frame) < zero_thr
                     )
                     if not (noise_check and vol_check and zero_check):
                         keep_word = False
@@ -521,17 +547,19 @@ def julgran(words, audio, Fs, fl, add_context=False, long_frame=False, plot_word
 
                 for i, v in enumerate(vowels):
                     if add_context:
+                        # If add_context, add a few frames in a row
                         grouped_frames[v]["frame"].append(
                             stitch_frames(
                                 frames[
                                     max(peak_frames[i] - 2, 0) : min(
-                                        peak_frames[i] + 2, len(frames)
+                                        peak_frames[i] + 3, len(frames)
                                     )
                                 ]
                             )
                         )
                     else:
                         if long_frame:
+                            # add middle part of long frame
                             f_long = frames[peak_frames[i]]
 
                             grouped_frames[v]["frame"].append(
@@ -544,15 +572,18 @@ def julgran(words, audio, Fs, fl, add_context=False, long_frame=False, plot_word
                             start_vowel = (
                                 start_segment
                                 + f_start[peak_frames[i]]
-                                - 3 * fl
                                 + len(f_long) / 2
                                 - fl / 2
                             )
+                            if zero_pad:
+                                start_vowel -= 3 * fl
 
                         else:
                             grouped_frames[v]["frame"].append(frames[peak_frames[i]])
                             # start and stop (of real frame) (-fl compensates zeropadding)
-                            start_vowel = start_segment + f_start[peak_frames[i]] - fl
+                            start_vowel = start_segment + f_start[peak_frames[i]]
+                            if zero_pad:
+                                start_vowel -= fl
 
                         grouped_frames[v]["start"].append(start_vowel / Fs)
                         grouped_frames[v]["stop"].append((start_vowel + fl) / Fs)
@@ -567,7 +598,7 @@ def julgran(words, audio, Fs, fl, add_context=False, long_frame=False, plot_word
                     f_start[peak_frames] + fl / 2,
                     hnr_frames[peak_frames] / hnr_frames.max(),
                     "*r",
-                    label = "chosen peaks"
+                    label="chosen peaks",
                 )
                 plt.legend()
                 plt.show()
@@ -602,24 +633,8 @@ def outlier_filter(grouped_frames, Fs):
     return frames_inlier
 
 
-def get_start_stop_seconds(grouped_frames, fl, Fs):
-    """Not a good method (input is samples, output is seconds)"""
-    starts_all = []
-    for v in grouped_frames.keys():
-        starts_all.extend(grouped_frames[v]["start"])
-    starts_all = np.array(starts_all)
-
-    print("total found vowels:", len(starts_all))
-    print("unique start points:", len(np.unique(starts_all)))
-    starts_all = np.sort(starts_all)
-    stops_all = starts_all + fl
-    starts_all_seconds = starts_all / Fs
-    stops_all_seconds = stops_all / Fs
-    return starts_all_seconds, stops_all_seconds
-
-
 def groupedframes_to_lists(grouped_frames):
-    """Convert a grouped_frames to three lists"""
+    """Convert a grouped_frames dictionary to three lists"""
     starts_all = []
     stops_all = []
     vowels_all = []
@@ -642,17 +657,38 @@ def groupedframes_to_lists(grouped_frames):
     return starts_all, stops_all, vowels_all
 
 
-def score_vs_labels(starts, stops, labels_df, vowels=None, snäll=False):
-    """computes precision and recall, by comparing starts and stops with labels tmin, tmax
-    TODO: Optionally considers vowel classification"""
+def score_vs_labels(starts, stops, labels_df, vowels=None, accept_partial=False):
+    """Compute precision and recall, for timestamps, and optionally vowel classification.
+
+    ## Parameters
+    starts (list): List of model start points
+    stops (list): List of model stop points
+    labels_df (DataFrame): Reference timestamps and vowel labels (tmin,tmax,vowel).
+    accept_partial (bool): If true, a vowel is considered correct even if
+    only part of the intervals overlap.
+    vowels (list[str]): model vowels. If None, assume all to be correctly classified.
+
+    ## Returns
+    precision (float): How many of model vowels are correct?
+    recall (float): How many of reference vowels were found?
+    """
     included = 0
+    print("Classification errors:")
+
     for i, (start, stop) in enumerate(zip(starts, stops)):
-        if not snäll:
-            f = lambda x: (start >= x.tmin) and (stop <= x.tmax)
+        if not accept_partial:
+
+            def f(x):
+                return start >= x.tmin and stop <= x.tmax
         else:
-            f = lambda x: ((start >= x.tmin) and (start <= x.tmax)) or (
-                (stop >= x.tmin) and (stop <= x.tmax)
-            )
+
+            def f(x):
+                return (
+                    start >= x.tmin
+                    and start <= x.tmax
+                    or stop >= x.tmin
+                    and stop <= x.tmax
+                )
 
         bol = labels_df.apply(
             f,
@@ -665,16 +701,17 @@ def score_vs_labels(starts, stops, labels_df, vowels=None, snäll=False):
                 if correct_vowel == vowels[i]:
                     included += 1
                 else:
-                    print("We got", vowels[i])
-                    print("Correct vowel", correct_vowel)
+                    print(f"- at {start}s:")
+                    print("    We got", vowels[i])
+                    print("    Correct vowel", correct_vowel)
             else:
                 included += 1
 
-    print("included:", included)
+    precision = included / len(starts)
+    recall = included / len(labels_df)
 
-    prec = included / len(starts)
-    reca = included / len(labels_df)
+    print("-"*30)
+    print(f"precision: {round(100*precision,3)}% ({included}/{len(starts)})")
+    print(f"recall: {round(100*recall,3)}% ({included}/{len(labels_df)})")
 
-    print("Assuming Tobias.exe perfect and all vowels correctly classified:")
-    print("precision:", prec)
-    print("recall:", reca)
+    return precision, recall
