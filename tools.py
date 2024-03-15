@@ -12,7 +12,7 @@ from Signal_Analysis.features.signal import get_F_0, get_HNR
 from vosk import KaldiRecognizer, Model, SetLogLevel
 from sklearn import preprocessing, ensemble
 
-from folderFunctions import *
+from folderFunctions import updateFolder
 
 # constants
 VOWELS_SV = ("e", "y", "u", "i", "o", "å", "a", "ö", "ä")
@@ -414,7 +414,7 @@ def HNR_peaks_old(audio, Fs, n_peaks=-1, plotit=False):
 
 def HNR_peaks(frames, Fs, n_peaks=-1, min_dist=True):
     """Get frame index for peaks and hnr per frame
-    
+
     ## Parameters
     frames (list[ndarray]): Audio frames
     Fs (int): Sampling frequency
@@ -667,6 +667,21 @@ def groupedframes_to_lists(grouped_frames):
     return starts_all, stops_all, vowels_all
 
 
+def groupedframes_to_files(grouped_frames, Fs):
+    """TODO: export files"""
+    for v in grouped_frames.keys():
+        data_keys = list(grouped_frames[v].keys())
+        data_keys.remove("frame")
+        print(data_keys)
+        for i in range(len(grouped_frames[v]["frame"])):
+            # audio frame
+            frame = grouped_frames[v]["frame"][i]
+            data = {k: grouped_frames[v][k][i] for k in data_keys}
+
+            updateFolder("Swedish", wavScaler(frame), v, "test", fs=Fs)
+            
+
+
 def score_vs_labels(starts, stops, labels_df, vowels=None, accept_partial=False):
     """Compute precision and recall, for timestamps, and optionally vowel classification.
 
@@ -720,11 +735,12 @@ def score_vs_labels(starts, stops, labels_df, vowels=None, accept_partial=False)
     precision = included / len(starts)
     recall = included / len(labels_df)
 
-    print("-"*30)
+    print("-" * 30)
     print(f"precision: {round(100*precision,3)}% ({included}/{len(starts)})")
     print(f"recall: {round(100*recall,3)}% ({included}/{len(labels_df)})")
 
     return precision, recall
+
 
 def plot_intervals(audio, starts_all, stops_all, labels_df, Fs):
     tt = np.arange(len(audio)) / Fs
