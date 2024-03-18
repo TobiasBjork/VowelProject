@@ -515,7 +515,7 @@ def extract_vowels(
     for w, segment, vowels, start_segment in zip(
         words, segments, vowels_per_segment, s_starts
     ):
-        if w["conf"] >= 1 and not contains_m_n(w["word"]):
+        if w["conf"] >= 1:
             # zero padding
             if long_frame:
                 if zero_pad:
@@ -650,7 +650,7 @@ def outlier_filter(grouped_frames, Fs):
     return frames_inlier
 
 
-def groupedframes_to_lists(grouped_frames):
+def groupedframes_to_lists(grouped_frames, print_info = True):
     """Convert a grouped_frames dictionary to three lists"""
     starts_all = []
     stops_all = []
@@ -662,10 +662,10 @@ def groupedframes_to_lists(grouped_frames):
 
     starts_all = np.array(starts_all)
     stops_all = np.array(stops_all)
-
-    print("total found vowels:", len(starts_all))
-    print("unique start points:", len(np.unique(starts_all)))
-    print("unique stop points:", len(np.unique(stops_all)))
+    if print_info:
+        print("total found vowels:", len(starts_all))
+        print("unique start points:", len(np.unique(starts_all)))
+        print("unique stop points:", len(np.unique(stops_all)))
 
     indx = np.argsort(starts_all)
     starts_all = starts_all[indx]
@@ -728,7 +728,8 @@ def score_vs_labels(
         return (0, 0)
 
     included = 0
-    print("Classification errors:")
+    if print_info:
+        print("Classification errors:")
 
     for i, (start, stop) in enumerate(zip(starts, stops)):
         if not accept_partial:
