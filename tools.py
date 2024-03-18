@@ -11,6 +11,7 @@ from scipy.io.wavfile import write as writewav
 from Signal_Analysis.features.signal import get_F_0, get_HNR
 from vosk import KaldiRecognizer, Model, SetLogLevel
 from sklearn import preprocessing, ensemble
+import pandas as pd
 
 from folderFunctions import updateFolder
 
@@ -615,8 +616,10 @@ def extract_vowels(
 
     return grouped_frames
 
+
 def contains_m_n(word):
-    return ('m' in word) or ('n' in word)
+    return ("m" in word) or ("n" in word)
+
 
 def outlier_filter(grouped_frames, Fs):
     grouped_features = {v: [] for v in VOWELS_SV}
@@ -681,10 +684,11 @@ def groupedframes_to_files(grouped_frames, Fs):
             data = {k: grouped_frames[v][k][i] for k in data_keys}
 
             updateFolder("Swedish", wavScaler(frame), v, "test", fs=Fs)
-            
 
 
-def score_vs_labels(starts, stops, labels_df, vowels=None, accept_partial=False):
+def score_vs_labels(
+    starts, stops, labels_df: pd.DataFrame, vowels=None, accept_partial=False
+):
     """Compute precision and recall, for timestamps, and optionally vowel classification.
 
     ## Parameters
@@ -699,6 +703,10 @@ def score_vs_labels(starts, stops, labels_df, vowels=None, accept_partial=False)
     precision (float): How many of model vowels are correct?
     recall (float): How many of reference vowels were found?
     """
+
+    if "vowel" not in labels_df.columns:
+        vowels = None
+
     included = 0
     print("Classification errors:")
 
@@ -733,6 +741,9 @@ def score_vs_labels(starts, stops, labels_df, vowels=None, accept_partial=False)
                     print("    Correct vowel", correct_vowel)
             else:
                 included += 1
+        else:
+            # missed
+            print(f"- at {start}s: MISS")
 
     precision = included / len(starts)
     recall = included / len(labels_df)
