@@ -1,15 +1,15 @@
 import wave
-from json import loads
-from os import path
-
+import json 
+import os
+import glob
 import librosa as lib
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy import interpolate, ndimage, signal
 from scipy.io.wavfile import read as readwav
 from scipy.io.wavfile import write as writewav
-from Signal_Analysis.features.signal import get_F_0, get_HNR
-from vosk import KaldiRecognizer, Model, SetLogLevel
+from Signal_Analysis.features.signal import get_HNR
+from vosk import KaldiRecognizer, Model
 from sklearn import preprocessing, ensemble
 import pandas as pd
 
@@ -211,7 +211,7 @@ def preprocess(path_input: str, path_output="audio_preproc", bpfilt=None):
     bpfilt (tuple): low and high cutoff (Hz) for filter (default None).
     """
 
-    name = path.split(path_input[:-4])[-1]
+    name = os.path.split(path_input[:-4])[-1]
     print(f"preprocessing {name}")
 
     # if not path_input[-4:] == ".wav":
@@ -240,15 +240,15 @@ def preprocess(path_input: str, path_output="audio_preproc", bpfilt=None):
     # normalize
     x = wavScaler(x)
 
-    if path.exists(path_output):
-        writewav(path.join(path_output, name + "_pp.wav"), Fs, x)
+    if os.path.exists(path_output):
+        writewav(os.path.join(path_output, name + "_pp.wav"), Fs, x)
     else:
         print("output folder not found")
 
     return x
 
 
-def rec_vosk(audio_path: str, model, print_summary=True) -> list[dict]:
+def rec_vosk(audio_path: str, model:Model, print_summary=True) -> list[dict]:
     """Recognize speech in a audio file, using a provided vosk-model
 
     ## Parameters
@@ -272,12 +272,12 @@ def rec_vosk(audio_path: str, model, print_summary=True) -> list[dict]:
         if len(data) == 0:  # if end
             break
         if rec.AcceptWaveform(data):
-            part_result = loads(rec.Result())
+            part_result = json.loads(rec.Result())
             results.append(part_result)
 
     wf.close()  # close audiofile
 
-    part_result = loads(rec.FinalResult())
+    part_result = json.loads(rec.FinalResult())
     results.append(part_result)
 
     words = []
@@ -674,18 +674,29 @@ def groupedframes_to_lists(grouped_frames):
     return starts_all, stops_all, vowels_all
 
 
-def groupedframes_to_files(grouped_frames, Fs):
-    """TODO: export files"""
+def groupedframes_to_files(
+    grouped_frames, Fs, id, folderpath="Languages/Swedish/Vowels"
+):
+    """Clear folder and save output."""
     for v in grouped_frames.keys():
         data_keys = list(grouped_frames[v].keys())
         data_keys.remove("frame")
-        print(data_keys)
+
+        # clear folder
+        files = glob.glob(os.path.join(folderpath,v,"*"))
+        for f in files:
+            os.remove(f)
+
         for i in range(len(grouped_frames[v]["frame"])):
             # audio frame
             frame = grouped_frames[v]["frame"][i]
             data = {k: grouped_frames[v][k][i] for k in data_keys}
+            filename_wav = os.path.join(folderpath, v, f"{id}-{v}{i}.wav")
+            filename_json = os.path.join(folderpath, v, f"{id}-{v}{i}.json")
 
-            updateFolder("Swedish", wavScaler(frame), v, "test", fs=Fs)
+            writewav(filename_wav, Fs, wavScaler(frame))
+            with open(filename_json, "w") as f:
+                json.dump(data, f)
 
 
 def score_vs_labels(
