@@ -490,6 +490,7 @@ def extract_vowels(
     add_context=False,
     long_frame=False,
     plot_word="",
+    print_info=True,
 ):
     """Extract vowels from audio.
 
@@ -551,10 +552,11 @@ def extract_vowels(
                     if not (noise_check and vol_check and zero_check):
                         keep_word = False
 
-            if not keep_word:
+            if not keep_word and print_info:
                 print("trash", w["word"])
             if keep_word:
-                print("keep", w["word"])
+                if print_info:
+                    print("keep", w["word"])
 
                 for i, v in enumerate(vowels):
                     if add_context:
@@ -687,7 +689,12 @@ def groupedframes_to_files(grouped_frames, Fs):
 
 
 def score_vs_labels(
-    starts, stops, labels_df: pd.DataFrame, vowels=None, accept_partial=False
+    starts,
+    stops,
+    labels_df: pd.DataFrame,
+    vowels=None,
+    accept_partial=False,
+    print_info=True,
 ):
     """Compute precision and recall, for timestamps, and optionally vowel classification.
 
@@ -706,6 +713,8 @@ def score_vs_labels(
 
     if "vowel" not in labels_df.columns:
         vowels = None
+    if len(starts) == 0:
+        return (0, 0)
 
     included = 0
     print("Classification errors:")
@@ -735,27 +744,29 @@ def score_vs_labels(
                 correct_vowel = labels_df["vowel"][indx]
                 if correct_vowel == vowels[i]:
                     included += 1
-                else:
+                elif print_info:
                     print(f"- at {start}s:")
                     print("    We got", vowels[i])
                     print("    Correct vowel", correct_vowel)
             else:
                 included += 1
-        else:
+        elif print_info:
             # missed
             print(f"- at {start}s: MISS")
 
     precision = included / len(starts)
     recall = included / len(labels_df)
 
-    print("-" * 30)
-    print(f"precision: {round(100*precision,3)}% ({included}/{len(starts)})")
-    print(f"recall: {round(100*recall,3)}% ({included}/{len(labels_df)})")
+    if print_info:
+        print("-" * 30)
+        print(f"precision: {round(100*precision,3)}% ({included}/{len(starts)})")
+        print(f"recall: {round(100*recall,3)}% ({included}/{len(labels_df)})")
 
     return precision, recall
 
 
 def plot_intervals(audio, starts_all, stops_all, labels_df, Fs):
+    """Plot found intervals and reference intervals"""
     tt = np.arange(len(audio)) / Fs
     plt.plot(tt, audio, alpha=0.6, label="audio")
     plt.vlines(starts_all, *plt.ylim(), colors="r", label="Model output")
