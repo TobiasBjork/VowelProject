@@ -513,7 +513,7 @@ def extract_vowels(
     for w, segment, vowels, start_segment in zip(
         words, segments, vowels_per_segment, s_starts
     ):
-        if w["conf"] >= 1:
+        if w["conf"] >= 1 and not contains_m_n(w["word"]):
             # zero padding
             if long_frame:
                 if zero_pad:
@@ -615,6 +615,8 @@ def extract_vowels(
 
     return grouped_frames
 
+def contains_m_n(word):
+    return ('m' in word) or ('n' in word)
 
 def outlier_filter(grouped_frames, Fs):
     grouped_features = {v: [] for v in VOWELS_SV}
