@@ -12,6 +12,7 @@ from Signal_Analysis.features.signal import get_HNR
 from vosk import KaldiRecognizer, Model
 from sklearn import preprocessing, ensemble
 import pandas as pd
+import pathlib
 
 from folderFunctions import updateFolder
 
@@ -45,7 +46,7 @@ def envelope(s, dmax=1, smoothing=10):
     return env
 
 
-def split_frames(x, fl, Fs, overlap=0, vol_thr=0, print_info=False):
+def split_frames(x, fl, Fs, overlap=0, print_info=False):
     """Splits the signal ``x`` into frames of length ``fl``.
     ## Returns
     frames: list[ndarray]
@@ -55,7 +56,6 @@ def split_frames(x, fl, Fs, overlap=0, vol_thr=0, print_info=False):
     f_start = np.arange(0, len(x), fl - overlap)
     # list of frames
     frames = [x[s : s + fl] for s in f_start]
-    frames = [f * (vol(f) > vol_thr) for f in frames]
 
     if print_info:
         print(f"frame length    : {fl} samples")
@@ -483,7 +483,7 @@ def extract_vowels(
     white_thr=0.8,
     vol_thr=50,
     zero_thr=0.5,
-    zero_thr_2 = 0.05,
+    zero_thr_2=0.05,
     zero_pad=True,
     add_context=False,
     long_frame=True,
@@ -503,7 +503,7 @@ def extract_vowels(
     - vol_thr (float): lower threshold for volume. Default 45dB
     - zero_pad (bool): zero padding start/end of frames to enable peaks at the ends to be found. Default true
     - add_context (bool): adds two extra frames on each side of the peakframe in order to more clearly hear the result. Default False
-    - long_frame (bool): uses 3*fl instead of fl as frame length and also performes an overlap of 2/3*fl. Default False 
+    - long_frame (bool): uses 3*fl instead of fl as frame length and also performes an overlap of 2/3*fl. Default False
     - plot_word (str): plots the frames and corresponding HNR value for the choosen word. Default is no word ("")
     ## Returns
     - grouped_frames (dict(dict(list))): Dictionary of dictionary of list. Vowels are keys to the first dictionary which then have the keys: start,stop and frame that are lists.
@@ -533,16 +533,12 @@ def extract_vowels(
                         (np.zeros(3 * fl), segment, np.zeros(3 * fl))
                     )
 
-                frames, f_start = split_frames(
-                    segment, 3 * fl, Fs, vol_thr=0, overlap=int(2 * fl)
-                )
+                frames, f_start = split_frames(segment, 3 * fl, Fs, overlap=int(2 * fl))
             else:
                 if zero_pad:
                     segment = np.concatenate((np.zeros(fl), segment, np.zeros(fl)))
 
-                frames, f_start = split_frames(
-                    segment, fl, Fs, vol_thr=0, overlap=int(0)
-                )
+                frames, f_start = split_frames(segment, fl, Fs, overlap=int(0))
 
             # compute HNR and find peaks
             peak_frames, hnr_frames = HNR_peaks(
@@ -558,7 +554,8 @@ def extract_vowels(
                     noise_check = not checkIfWhite(frame, wNoiseRatio=white_thr)
                     vol_check = vol_db(frame) > vol_thr
                     zero_check = (
-                        np.sum(abs(frame) < zero_thr_2 * max(frame)) / len(frame) < zero_thr
+                        np.sum(abs(frame) < zero_thr_2 * max(frame)) / len(frame)
+                        < zero_thr
                     )
                     if not (noise_check and vol_check and zero_check):
                         keep_word = False
@@ -694,17 +691,19 @@ def groupedframes_to_files(
     grouped_frames, Fs, id, folderpath="Languages/Swedish/Vowels", clear_folder=False
 ):
     """Save output as wav-files and json metadata.
-    
-    ## Parameters 
+
+    ## Parameters
     grouped_frames (dict): output from ``extract_vowels``
     Fs (int): sample rate
     id (str): unique identifier for the audio recording
     folderpath (str): output folder
-    clear_folder (bool): clear folder before saving (default: False)  
+    clear_folder (bool): clear folder before saving (default: False)
     """
     for v in grouped_frames.keys():
         data_keys = list(grouped_frames[v].keys())
         data_keys.remove("frame")
+
+        pathlib.Path(os.path.join(folderpath, v)).mkdir(parents=True, exist_ok=True)
 
         if clear_folder:
             files = glob.glob(os.path.join(folderpath, v, "*"))
