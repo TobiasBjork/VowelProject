@@ -1,5 +1,5 @@
 import wave
-import json 
+import json
 import os
 import glob
 import librosa as lib
@@ -248,7 +248,7 @@ def preprocess(path_input: str, path_output="audio_preproc", bpfilt=None):
     return x
 
 
-def rec_vosk(audio_path: str, model:Model, print_summary=True) -> list[dict]:
+def rec_vosk(audio_path: str, model: Model, print_summary=True) -> list[dict]:
     """Recognize speech in a audio file, using a provided vosk-model
 
     ## Parameters
@@ -508,6 +508,8 @@ def extract_vowels(
         grouped_frames[v]["frame"] = []
         grouped_frames[v]["start"] = []
         grouped_frames[v]["stop"] = []
+        grouped_frames[v]["hnr"] = []
+        grouped_frames[v]["origin_word"] = []
 
     segments, vowels_per_segment, s_starts = segment_by_words(
         words, audio, Fs, VOWELS_SV, signal_pad=0
@@ -598,8 +600,13 @@ def extract_vowels(
                             if zero_pad:
                                 start_vowel -= fl
 
+                        # append metadata
                         grouped_frames[v]["start"].append(start_vowel / Fs)
                         grouped_frames[v]["stop"].append((start_vowel + fl) / Fs)
+                        grouped_frames[v]["hnr"].append(hnr_frames[peak_frames[i]])
+                        grouped_frames[v]["origin_word"].append(w["word"])
+
+            # optionally plot hnr and signal for a word
             if w["word"] == plot_word:
                 plt.figure()
                 plt.plot(segment / segment.max(), label=f"""segment ({w["word"]})""")
@@ -650,7 +657,7 @@ def outlier_filter(grouped_frames, Fs):
     return frames_inlier
 
 
-def groupedframes_to_lists(grouped_frames, print_info = True):
+def groupedframes_to_lists(grouped_frames, print_info=True):
     """Convert a grouped_frames dictionary to three lists"""
     starts_all = []
     stops_all = []
@@ -675,17 +682,17 @@ def groupedframes_to_lists(grouped_frames, print_info = True):
 
 
 def groupedframes_to_files(
-    grouped_frames, Fs, id, folderpath="Languages/Swedish/Vowels"
+    grouped_frames, Fs, id, folderpath="Languages/Swedish/Vowels", clear_folder=False
 ):
-    """Clear folder and save output."""
+    """Save output as wav-files and json metadata"""
     for v in grouped_frames.keys():
         data_keys = list(grouped_frames[v].keys())
         data_keys.remove("frame")
 
-        # clear folder
-        files = glob.glob(os.path.join(folderpath,v,"*"))
-        for f in files:
-            os.remove(f)
+        if clear_folder:
+            files = glob.glob(os.path.join(folderpath, v, "*"))
+            for f in files:
+                os.remove(f)
 
         for i in range(len(grouped_frames[v]["frame"])):
             # audio frame
