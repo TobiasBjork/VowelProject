@@ -424,8 +424,7 @@ def HNR_peaks(frames, Fs, n_peaks=-1, min_distance=1, height_factor=0.1):
     """
     hnr_frames = np.array([get_HNR(f, Fs) for f in frames])
 
-    min_d = min_distance*max(len(frames) / (n_peaks + 2), 1)  # frames
-  
+    min_d = max(min_distance * (len(frames) / (n_peaks + 2)), 1)  # frames
 
     # find peaks
     peaks, peaks_prop = signal.find_peaks(
@@ -482,23 +481,32 @@ def extract_vowels(
     Fs,
     fl,
     white_thr=0.8,
-    vol_thr=45,
+    vol_thr=50,
     zero_thr=0.5,
+    zero_thr_2 = 0.05,
     zero_pad=True,
     add_context=False,
-    long_frame=False,
+    long_frame=True,
     plot_word="",
-    print_info=True,
-    min_distance = 1,
-    height_factor = 0.1,
+    print_info=False,
+    min_distance=1,
+    height_factor=0.1,
 ):
     """Extract vowels from audio.
 
     ## Parameters
-
+    - words (list of dicts): contains the word, start, end, conf
+    - audio (np array): audio file converted to array
+    - Fs (int): Sample rate
+    - fl (float): frame length in samples
+    - white_thr (float): threshold for the whiteness test. Cannot be larger than 1. Default 0.8
+    - vol_thr (float): lower threshold for volume. Default 45dB
+    - zero_pad (bool): zero padding start/end of frames to enable peaks at the ends to be found. Default true
+    - add_context (bool): adds two extra frames on each side of the peakframe in order to more clearly hear the result. Default False
+    - long_frame (bool): uses 3*fl instead of fl as frame length and also performes an overlap of 2/3*fl. Default False 
+    - plot_word (str): plots the frames and corresponding HNR value for the choosen word. Default is no word ("")
     ## Returns
-
-
+    - grouped_frames (dict(dict(list))): Dictionary of dictionary of list. Vowels are keys to the first dictionary which then have the keys: start,stop and frame that are lists.
     """
     # output structure
     grouped_frames = {v: {} for v in VOWELS_SV}
@@ -528,9 +536,6 @@ def extract_vowels(
                 frames, f_start = split_frames(
                     segment, 3 * fl, Fs, vol_thr=0, overlap=int(2 * fl)
                 )
-                peak_frames, hnr_frames = HNR_peaks(
-                    frames, Fs, len(vowels), min_dist=False
-                )
             else:
                 if zero_pad:
                     segment = np.concatenate((np.zeros(fl), segment, np.zeros(fl)))
@@ -538,7 +543,11 @@ def extract_vowels(
                 frames, f_start = split_frames(
                     segment, fl, Fs, vol_thr=0, overlap=int(0)
                 )
-                peak_frames, hnr_frames = HNR_peaks(frames, Fs, len(vowels), min_distance, height_factor)
+
+            # compute HNR and find peaks
+            peak_frames, hnr_frames = HNR_peaks(
+                frames, Fs, len(vowels), min_distance, height_factor
+            )
 
             # Check all vowels in word before keeping frames
             keep_word = False
@@ -549,7 +558,7 @@ def extract_vowels(
                     noise_check = not checkIfWhite(frame, wNoiseRatio=white_thr)
                     vol_check = vol_db(frame) > vol_thr
                     zero_check = (
-                        np.sum(abs(frame) < 0.1 * max(frame)) / len(frame) < zero_thr
+                        np.sum(abs(frame) < zero_thr_2 * max(frame)) / len(frame) < zero_thr
                     )
                     if not (noise_check and vol_check and zero_check):
                         keep_word = False
@@ -684,7 +693,15 @@ def groupedframes_to_lists(grouped_frames, print_info=True):
 def groupedframes_to_files(
     grouped_frames, Fs, id, folderpath="Languages/Swedish/Vowels", clear_folder=False
 ):
-    """Save output as wav-files and json metadata"""
+    """Save output as wav-files and json metadata.
+    
+    ## Parameters 
+    grouped_frames (dict): output from ``extract_vowels``
+    Fs (int): sample rate
+    id (str): unique identifier for the audio recording
+    folderpath (str): output folder
+    clear_folder (bool): clear folder before saving (default: False)  
+    """
     for v in grouped_frames.keys():
         data_keys = list(grouped_frames[v].keys())
         data_keys.remove("frame")
