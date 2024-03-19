@@ -413,7 +413,7 @@ def HNR_peaks_old(audio, Fs, n_peaks=-1, plotit=False):
     return frames, peaks_prop, peaks, peak_sounds
 
 
-def HNR_peaks(frames, Fs, n_peaks=-1, min_dist=True):
+def HNR_peaks(frames, Fs, n_peaks=-1, min_distance=1, height_factor=0.1):
     """Get frame index for peaks and hnr per frame
 
     ## Parameters
@@ -424,16 +424,14 @@ def HNR_peaks(frames, Fs, n_peaks=-1, min_dist=True):
     """
     hnr_frames = np.array([get_HNR(f, Fs) for f in frames])
 
-    if min_dist:
-        min_distance = max(len(frames) / (n_peaks + 2), 1)  # frames
-    else:
-        min_distance = 1
+    min_d = min_distance*max(len(frames) / (n_peaks + 2), 1)  # frames
+  
 
     # find peaks
     peaks, peaks_prop = signal.find_peaks(
         hnr_frames,
-        height=0.1 * max(hnr_frames),
-        distance=min_distance,
+        height=height_factor * max(hnr_frames),
+        distance=min_d,
     )
     order = (-peaks_prop["peak_heights"]).argsort()  # order
     peaks = peaks[order[:n_peaks]]  # sort and truncate
@@ -491,6 +489,8 @@ def extract_vowels(
     long_frame=False,
     plot_word="",
     print_info=True,
+    min_distance = 1,
+    height_factor = 0.1,
 ):
     """Extract vowels from audio.
 
@@ -538,7 +538,7 @@ def extract_vowels(
                 frames, f_start = split_frames(
                     segment, fl, Fs, vol_thr=0, overlap=int(0)
                 )
-                peak_frames, hnr_frames = HNR_peaks(frames, Fs, len(vowels))
+                peak_frames, hnr_frames = HNR_peaks(frames, Fs, len(vowels), min_distance, height_factor)
 
             # Check all vowels in word before keeping frames
             keep_word = False
