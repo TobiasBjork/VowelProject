@@ -438,14 +438,6 @@ def HNR_peaks(frames, Fs, n_peaks=-1, min_distance=1, height_factor=0.1):
     return peaks, hnr_frames
 
 
-def extractVowels(segments, vowels_segments, Fs, language, id):
-    for i in range(len(segments)):
-        frames, peaks_prop, peaks, peaks_sounds = HNR_peaks(segments[i], Fs)
-        if len(peaks) == len(vowels_segments[i]):
-            for j in range(len(peaks)):
-                updateFolder(language, peaks_sounds[j], vowels_segments[i][j], id, Fs)
-
-
 def get_mfcc(x, Fs, n=50, normalize=True):
     """Compute n first MFC Coefficients,
     for a list of segments it returns coefficient for every (normalized) segment"""
@@ -664,14 +656,24 @@ def outlier_filter(grouped_frames, Fs):
 
 
 def groupedframes_to_lists(grouped_frames, print_info=True):
-    """Convert a grouped_frames dictionary to three lists"""
+    """Convert a grouped_frames dictionary to lists, sorted by time.
+
+    ## Returns
+    - starts_all
+    - stops_all
+    - vowels_all
+    - words_all
+    """
     starts_all = []
     stops_all = []
     vowels_all = []
+    words_all = []
     for v in grouped_frames.keys():
+        N_frames = len(grouped_frames[v]["start"])
         starts_all.extend(grouped_frames[v]["start"])
         stops_all.extend(grouped_frames[v]["stop"])
-        vowels_all.extend([v] * len(grouped_frames[v]["start"]))
+        vowels_all.extend([v] * N_frames)
+        words_all.extend(grouped_frames[v]["origin_word"])
 
     starts_all = np.array(starts_all)
     stops_all = np.array(stops_all)
@@ -684,7 +686,8 @@ def groupedframes_to_lists(grouped_frames, print_info=True):
     starts_all = starts_all[indx]
     stops_all = stops_all[indx]
     vowels_all = [vowels_all[i] for i in indx]
-    return starts_all, stops_all, vowels_all
+    words_all = [words_all[i] for i in indx]
+    return starts_all, stops_all, vowels_all, words_all
 
 
 def groupedframes_to_files(
@@ -723,10 +726,8 @@ def groupedframes_to_files(
 
 
 def score_vs_labels(
-    starts,
-    stops,
+    grouped_frames,
     labels_df: pd.DataFrame,
-    vowels=None,
     accept_partial=False,
     print_info=True,
 ):
@@ -744,9 +745,12 @@ def score_vs_labels(
     precision (float): How many of model vowels are correct?
     recall (float): How many of reference vowels were found?
     """
+    starts, stops, vowels, words = groupedframes_to_lists(grouped_frames, print_info=False)
 
+    # if reference with only time labels
     if "vowel" not in labels_df.columns:
         vowels = None
+    # if empty input
     if len(starts) == 0:
         return (0, 0)
 
@@ -754,6 +758,7 @@ def score_vs_labels(
     if print_info:
         print("Classification errors:")
 
+    error_words = []
     for i, (start, stop) in enumerate(zip(starts, stops)):
         if not accept_partial:
 
@@ -787,7 +792,8 @@ def score_vs_labels(
                 included += 1
         elif print_info:
             # missed
-            print(f"- at {start}s: MISS")
+            print(f"- at {start}s: MISS classed as {vowels[i]}, word: {words[i]}")
+            error_words.append(words[i])
 
     precision = included / len(starts)
     recall = included / len(labels_df)
@@ -797,7 +803,7 @@ def score_vs_labels(
         print(f"precision: {round(100*precision,3)}% ({included}/{len(starts)})")
         print(f"recall: {round(100*recall,3)}% ({included}/{len(labels_df)})")
 
-    return precision, recall
+    return precision, recall, error_words
 
 
 def plot_intervals(audio, starts_all, stops_all, labels_df, Fs):
