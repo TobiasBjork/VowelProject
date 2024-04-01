@@ -363,12 +363,14 @@ def checkIfWhite(signal, wNoiseRatio=0.8):
     wNoiseRatio (float): minimum ratio of ...
 
     ## Returns
-    white (bool)"""
+    white (bool): if over threshold
+    ratio (float): measured ratio
+    """
     sum0, sum1 = 0, 0
     for i in range(1, len(signal)):
         sum0 += abs(signal[i])
         sum1 += abs(signal[i] - signal[i - 1])
-    return sum1 / sum0 > wNoiseRatio
+    return (sum1 / sum0 > wNoiseRatio), sum1 / sum0
 
 
 def HNR_peaks_old(audio, Fs, n_peaks=-1, plotit=False):
@@ -510,6 +512,8 @@ def extract_vowels(
         grouped_frames[v]["stop"] = []
         grouped_frames[v]["hnr"] = []
         grouped_frames[v]["origin_word"] = []
+        grouped_frames[v]["volume"] = []
+        grouped_frames[v]["noise_ratio"] = []
 
     segments, vowels_per_segment, s_starts = segment_by_words(
         words, audio, Fs, VOWELS_SV, signal_pad=0
@@ -543,8 +547,10 @@ def extract_vowels(
                 keep_word = True
                 for i, v in enumerate(vowels):
                     frame = frames[peak_frames[i]]
-                    noise_check = not checkIfWhite(frame, wNoiseRatio=white_thr)
-                    vol_check = vol_db(frame) > vol_thr
+                    wnr = checkIfWhite(frame, wNoiseRatio=white_thr)
+                    noise_check = not wnr[0]
+                    volume = vol_db(frame)
+                    vol_check = volume > vol_thr
                     zero_check = (
                         np.sum(abs(frame) < zero_thr_2 * max(frame)) / len(frame)
                         < zero_thr
@@ -603,6 +609,8 @@ def extract_vowels(
                         grouped_frames[v]["stop"].append((start_vowel + fl) / Fs)
                         grouped_frames[v]["hnr"].append(hnr_frames[peak_frames[i]])
                         grouped_frames[v]["origin_word"].append(w["word"])
+                        grouped_frames[v]["volume"].append(volume)
+                        grouped_frames[v]["noise_ratio"].append(wnr[1])
 
             # optionally plot hnr and signal for a word
             if w["word"] == plot_word:
@@ -691,7 +699,12 @@ def groupedframes_to_lists(grouped_frames, print_info=True):
 
 
 def groupedframes_to_files(
-    grouped_frames, Fs, id, folderpath="Languages/Swedish/Vowels", clear_folder=False
+    grouped_frames,
+    Fs,
+    id,
+    folderpath="Languages/Swedish/Vowels",
+    clear_folder=False,
+    metadata: dict = None,
 ):
     """Save output as wav-files and json metadata.
 
@@ -701,11 +714,13 @@ def groupedframes_to_files(
     id (str): unique identifier for the audio recording
     folderpath (str): output folder
     clear_folder (bool): clear folder before saving (default: False)
+    metadata (dict): common metadata to save in all files
     """
     for v in grouped_frames.keys():
         data_keys = list(grouped_frames[v].keys())
         data_keys.remove("frame")
 
+        # make folder if not exists
         pathlib.Path(os.path.join(folderpath, v)).mkdir(parents=True, exist_ok=True)
 
         if clear_folder:
@@ -717,6 +732,10 @@ def groupedframes_to_files(
             # audio frame
             frame = grouped_frames[v]["frame"][i]
             data = {k: grouped_frames[v][k][i] for k in data_keys}
+
+            if metadata:
+                data = data | metadata
+
             filename_wav = os.path.join(folderpath, v, f"{id}-{v}{i}.wav")
             filename_json = os.path.join(folderpath, v, f"{id}-{v}{i}.json")
 
@@ -745,7 +764,9 @@ def score_vs_labels(
     precision (float): How many of model vowels are correct?
     recall (float): How many of reference vowels were found?
     """
-    starts, stops, vowels, words = groupedframes_to_lists(grouped_frames, print_info=False)
+    starts, stops, vowels, words = groupedframes_to_lists(
+        grouped_frames, print_info=False
+    )
 
     # if reference with only time labels
     if "vowel" not in labels_df.columns:
