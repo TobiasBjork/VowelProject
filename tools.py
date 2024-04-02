@@ -505,6 +505,9 @@ def extract_vowels(
     # output structure
     grouped_frames = {v: {} for v in VOWELS_SV}
 
+    # to only plot once
+    plotted_first = False
+
     # initialize lists
     for v in grouped_frames.keys():
         grouped_frames[v]["frame"] = []
@@ -613,7 +616,8 @@ def extract_vowels(
                         grouped_frames[v]["noise_ratio"].append(wnr[1])
 
             # optionally plot hnr and signal for a word
-            if w["word"] == plot_word:
+            if not plotted_first and w["word"] == plot_word:
+                plotted_first = True
                 plt.figure()
                 plt.plot(segment / segment.max(), label=f"""segment ({w["word"]})""")
                 plt.vlines(f_start, *plt.ylim())
@@ -626,8 +630,7 @@ def extract_vowels(
                     "*r",
                     label="chosen peaks",
                 )
-                plt.legend()
-                plt.show()
+                plt.legend(loc="lower right")
 
     return grouped_frames
 
@@ -675,7 +678,7 @@ def groupedframes_to_lists(grouped_frames, print_info=True):
     starts_all = []
     stops_all = []
     vowels_all = []
-    words_all = []
+    words_all = []    
     for v in grouped_frames.keys():
         N_frames = len(grouped_frames[v]["start"])
         starts_all.extend(grouped_frames[v]["start"])
