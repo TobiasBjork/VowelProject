@@ -623,13 +623,13 @@ def extract_vowels(
                     offset = 3 * fl / 2
 
                 plotted_first = True
-                plt.figure()
+                
                 plt.plot(segment / segment.max(), label=f"""segment ({w["word"]})""")
                 plt.vlines(f_start, *plt.ylim(), linewidths=0.8, colors="#444")
                 plt.plot(
                     f_start + offset,
                     hnr_frames / hnr_frames.max(),
-                    "*",
+                    ".",
                     label="HNR",
                 )
                 plt.plot(
@@ -859,4 +859,5 @@ def plot_intervals(audio, starts_all, stops_all, labels_df, Fs):
     for start, stop in zip(starts_all, stops_all):
         plt.axvspan(start, stop, alpha=0.3, color="r")
 
-    plt.xlabel("time (s)")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Amplitude")
