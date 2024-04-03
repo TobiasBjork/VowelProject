@@ -617,20 +617,37 @@ def extract_vowels(
 
             # optionally plot hnr and signal for a word
             if not plotted_first and w["word"] == plot_word:
+                if not long_frame:
+                    offset = fl / 2
+                else:
+                    offset = 3 * fl / 2
+
                 plotted_first = True
                 plt.figure()
                 plt.plot(segment / segment.max(), label=f"""segment ({w["word"]})""")
-                plt.vlines(f_start, *plt.ylim())
+                plt.vlines(f_start, *plt.ylim(), linewidths=0.8, colors="#444")
                 plt.plot(
-                    f_start + fl / 2, hnr_frames / hnr_frames.max(), "*", label="HNR"
+                    f_start + offset,
+                    hnr_frames / hnr_frames.max(),
+                    "*",
+                    label="HNR",
                 )
                 plt.plot(
-                    f_start[peak_frames] + fl / 2,
+                    f_start[peak_frames] + offset,
                     hnr_frames[peak_frames] / hnr_frames.max(),
                     "*r",
                     label="chosen peaks",
                 )
-                plt.legend(loc="lower right")
+
+                word = w["word"]
+                plt.xlabel("Time from word start (samples)")
+                plt.ylabel("Normalized amplitude/HNR")
+                plt.title(f"Signal and HNR: '{word}'")
+
+                plt.legend(
+                    loc="lower right",
+                    fancybox=True,
+                )
 
     return grouped_frames
 
@@ -678,7 +695,7 @@ def groupedframes_to_lists(grouped_frames, print_info=True):
     starts_all = []
     stops_all = []
     vowels_all = []
-    words_all = []    
+    words_all = []
     for v in grouped_frames.keys():
         N_frames = len(grouped_frames[v]["start"])
         starts_all.extend(grouped_frames[v]["start"])
