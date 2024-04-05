@@ -623,7 +623,7 @@ def extract_vowels(
                     offset = 3 * fl / 2
 
                 plotted_first = True
-                
+
                 plt.plot(segment / segment.max(), label=f"""segment ({w["word"]})""")
                 plt.vlines(f_start, *plt.ylim(), linewidths=0.8, colors="#444")
                 plt.plot(
@@ -847,14 +847,19 @@ def score_vs_labels(
     return precision, recall, error_words
 
 
-def plot_intervals(audio, starts_all, stops_all, labels_df, Fs):
+def plot_intervals(audio, starts_all, stops_all, labels_df, Fs, plot_only=None):
     """Plot found intervals and reference intervals"""
     tt = np.arange(len(audio)) / Fs
     plt.plot(tt, audio, alpha=0.6, label="audio")
     plt.vlines(starts_all, *plt.ylim(), colors="r", label="Model output")
-    plt.vlines(labels_df.tmin, *plt.ylim(), colors="g", label="Reference ")
-    for tmin, tmax in zip(labels_df.tmin, labels_df.tmax):
-        plt.axvspan(tmin, tmax, alpha=0.5, color="g")
+    if not plot_only:
+        plt.vlines(labels_df.tmin, *plt.ylim(), colors="g", label="Reference ")
+    else:
+        plt.vlines(labels_df.tmin[plot_only], *plt.ylim(), colors="g", label="Reference ")
+
+    for i, (tmin, tmax) in enumerate(zip(labels_df.tmin, labels_df.tmax)):
+        if (not plot_only) or (i in plot_only):
+            plt.axvspan(tmin, tmax, alpha=0.5, color="g")
 
     for start, stop in zip(starts_all, stops_all):
         plt.axvspan(start, stop, alpha=0.3, color="r")
